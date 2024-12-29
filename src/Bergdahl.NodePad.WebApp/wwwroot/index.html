@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NodePad</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+</head>
+<body>
+<div class="title-pane">NodePad</div>
+<div id="container">
+    <div id="menu"></div>
+    <div id="editor-section">
+        <textarea id="editor"></textarea>
+        <button id="edit">Edit</button>
+        <button id="save" onClick="saveFile()">Save</button>
+    </div>    
+</div>
+<div id="footer">
+    - NodePad - Copyright© 2024 Jonny Bergdahl. - This project is open source -   
+    <a href="https://github.com/jonnybergdahl/NodePad" target="_blank" rel="noreferrer">Checkout our GitHub repository</a> -    
+</div>
+<script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
