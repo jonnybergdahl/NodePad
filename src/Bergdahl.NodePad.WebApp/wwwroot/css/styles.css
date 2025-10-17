@@ -1,3 +1,71 @@
+/* Theme tokens */
+:root {
+    /* Light (default) */
+    --bg: #ffffff;
+    --text: #111111;
+    --muted: #666666;
+    --panel: #f7f7f8;
+    --panel-contrast: #f0f0f0;
+    --border: #dddddd;
+    --hover: #e6e6e6;
+    --accent: #007bff;
+    --accent-contrast: #ffffff;
+    --danger: #dc3545;
+    --success: #28a745;
+    --warning: #ffc107;
+    --info: #17a2b8;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0f1115;
+        --text: #e6e6e6;
+        --muted: #a0a0a0;
+        --panel: #161923;
+        --panel-contrast: #11141c;
+        --border: #2a2f3a;
+        --hover: #242a36;
+        --accent: #4da3ff;
+        --accent-contrast: #0b0d12;
+        --danger: #ff6b81;
+        --success: #4fd27a;
+        --warning: #ffd166;
+        --info: #5ccfe6;
+    }
+}
+
+/* Explicit overrides via data-theme */
+:root[data-theme="light"] {
+    --bg: #ffffff;
+    --text: #111111;
+    --muted: #666666;
+    --panel: #f7f7f8;
+    --panel-contrast: #f0f0f0;
+    --border: #dddddd;
+    --hover: #e6e6e6;
+    --accent: #007bff;
+    --accent-contrast: #ffffff;
+    --danger: #dc3545;
+    --success: #28a745;
+    --warning: #ffc107;
+    --info: #17a2b8;
+}
+:root[data-theme="dark"] {
+    --bg: #0f1115;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --panel: #161923;
+    --panel-contrast: #11141c;
+    --border: #2a2f3a;
+    --hover: #242a36;
+    --accent: #4da3ff;
+    --accent-contrast: #0b0d12;
+    --danger: #ff6b81;
+    --success: #4fd27a;
+    --warning: #ffd166;
+    --info: #5ccfe6;
+}
+
 /* General reset */
 body, html {
     margin: 0;
@@ -5,28 +73,29 @@ body, html {
     font-family: Arial, sans-serif;
     height: 100%;
     display: block;
+    background-color: var(--bg);
+    color: var(--text);
 }
 
 /* Wrapper for layout */
 #container {
     display: flex;
     width: 100%;
-    height: 100vh; /* Full viewport height */
+    height: calc(100vh - 100px);
     overflow: hidden;
 }
 
 /* Menu styles */
 #menu {
-    width: 250px; /* Fixed width for the menu */
-    background-color: #f4f4f4;
-    border-right: 1px solid #ddd;
+    width: 250px;
+    min-width: 250px; /* Förhindra att menyn krymper */
+    flex-shrink: 0; /* Förhindra att menyn krymper i flexbox */
+    background-color: var(--panel);
+    border-right: 1px solid var(--border);
     padding: 15px;
-    overflow-y: auto; /* Scroll when content overflows */
+    overflow-y: auto;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-}
-
-#menu li {
-    margin: 4px 0;
+    font-size: 14px;
 }
 
 #menu ul {
@@ -35,62 +104,154 @@ body, html {
 }
 
 #menu ul ul {
-    padding-left: 4px;
+    padding-left: 20px;
+}
+
+#menu li {
+    margin: 4px 0;
+}
+
+#menu .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+#menu .menu-item:hover {
+    background-color: var(--hover);
+}
+
+#menu .folder-name {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+}
+
+#menu .folder-actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+#menu .menu-item:hover .folder-actions {
+    opacity: 1;
 }
 
 #menu a {
     text-decoration: none;
-    color: #333;
-    font-weight: bold;
-    display: block;
-    /*padding: 8px 12px;*/
-    border-radius: 4px;
+    color: var(--text);
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
 }
 
 #menu a:hover {
-    background-color: #ddd;
+    color: var(--accent);
+}
+
+#menu .icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+/* Ensure icons are visible on dark theme */
+html[data-theme="dark"] #menu .icon {
+    filter: invert(1) brightness(1.2);
+}
+
+#menu .delete-icon:hover,
+#menu .create-icon:hover {
+    opacity: 0.7;
 }
 
 /* Editor styles */
 #editor-section {
-    flex-grow: 1;
+    flex: 1;
+    min-width: 0; /* Viktigt för att förhindra overflow */
     display: flex;
     flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background-color: var(--panel-contrast);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+    flex-shrink: 0; /* Förhindra att toolbar krymper */
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background-color: var(--border);
+    margin: 0 4px;
+}
+
+/* Breadcrumb bar under the toolbar */
+.breadcrumbs {
+    padding: 8px 12px;
+    background-color: var(--panel);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.breadcrumbs .crumb {
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+}
+.breadcrumbs .crumb:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+.breadcrumbs .sep {
+    color: var(--muted);
+}
+
+/* Editor/Viewer containers */
+#editor,
+#editor-edit {
+    flex: 1;
+    min-height: 0; /* Viktigt för att förhindra overflow */
+    overflow: auto;
     padding: 15px;
 }
 
-.editor {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-    justify-content: space-between;
-    align-items: stretch;
-    height: 100vh;
-    width: 100vw;
-}
-
-textarea1 {
-    width: 100%;
-    height: calc(100% - 50px); /* Leave space for the Save button */
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 10px;
-    font-family: monospace; /* Use a monospace font for code-like editing */
-    font-size: 14px;
-    resize: none; /* Prevent resizing */
-    background-color: #fff;
-    color: #333;
-    box-sizing: border-box; /* Ensures padding is included in dimensions */
-    z-index: 1;
-    position: relative; /* Ensure it's not covered by other elements */
+/* Säkerställ att Toast UI Editor inte blir för bred */
+#editor-edit .toastui-editor-defaultUI,
+#editor .toastui-editor-defaultUI {
+    width: 100% !important;
+    max-width: 100% !important;
 }
 
 .title-pane {
     padding: 20px;
-    background-color: #f8f9fa; /* light gray */
+    background-color: var(--accent);
+    color: var(--accent-contrast);
     font-size: 24px;
     text-align: left;
-    border-bottom: 1px solid #dee2e6; /* darker gray */
+    border-bottom: 1px solid var(--border);
 }
 
 #footer {
@@ -98,36 +259,402 @@ textarea1 {
     left: 0;
     bottom: 0;
     width: 100%;
-    background-color: #317EFB;
-    color: white;
+    background-color: var(--accent);
+    color: var(--accent-contrast);
     text-align: center;
-    padding: 10px 0;  /* change this according to your needs, it's vertical and horizontal padding */
+    padding: 10px 0;
+    font-size: 12px;
+    z-index: 1000;
 }
 
+#footer a {
+    color: var(--accent-contrast);
+    text-decoration: underline;
+}
+
+/* Ensure footer text is white in dark theme */
+:root[data-theme="dark"] #footer,
+:root[data-theme="dark"] #footer a {
+    color: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) #footer,
+    :root:not([data-theme="light"]) #footer a {
+        color: #ffffff;
+    }
+}
+
+/* Buttons */
 button {
-    margin-top: 10px;
-    padding: 10px 15px;
-    background-color: #007BFF;
-    color: white;
+    margin: 0;
+    padding: 8px 16px;
+    background-color: var(--accent);
+    color: var(--accent-contrast);
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    align-self: flex-start;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
 }
 
 button:disabled {
-    background-color: lightgray;
+    background-color: var(--hover);
+    color: var(--muted);
+    cursor: not-allowed;
+    opacity: 0.6;
 }
+
 button:hover:not(:disabled) {
     background-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* Button variants */
+#btn-save {
+    background-color: #28a745;
+}
+
+#btn-save:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+#btn-cancel {
+    background-color: #6c757d;
+}
+
+#btn-cancel:hover:not(:disabled) {
+    background-color: #5a6268;
+}
+
+#btn-delete {
+    background-color: #dc3545;
+}
+
+#btn-delete:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+
 
 .selected {
-    background-color: lightgray;
+    background-color: var(--hover) !important;
 }
 
-.icon {
-    width:16px;
-    height:16px;
-    vertical-align: middle;
+/* Toast UI Editor custom styling */
+.toastui-editor-defaultUI {
+    border: 1px solid var(--border);
+    border-radius: 4px;
 }
+
+.toastui-editor-viewer {
+    padding: 20px;
+}
+
+/* Hidden state */
+.hidden {
+    display: none !important;
+}
+
+/* Modal Dialog */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.modal-overlay.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal {
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.4);
+    min-width: 400px;
+    max-width: 500px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--text);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: var(--text);
+    transform: none;
+    box-shadow: none;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-body p {
+    margin: 0 0 15px 0;
+    color: var(--muted);
+}
+
+.modal-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.modal-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modal-btn-primary {
+    background-color: #007BFF;
+    color: white;
+}
+
+.modal-btn-primary:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.modal-btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.modal-btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* Toast Notifications */
+#toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 16px 20px;
+    min-width: 300px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-success {
+    border-left: 4px solid #28a745;
+}
+
+.toast-error {
+    border-left: 4px solid #dc3545;
+}
+
+.toast-info {
+    border-left: 4px solid #17a2b8;
+}
+
+.toast-warning {
+    border-left: 4px solid #ffc107;
+}
+
+.toast-icon {
+    font-size: 24px;
+}
+
+.toast-message {
+    flex-grow: 1;
+    color: #333;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.toast-close:hover {
+    color: #333;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+
+/* Toolbar right side theme switcher */
+.toolbar {
+    justify-content: flex-start;
+}
+.toolbar-spacer { margin-left: auto; }
+.theme-select {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+}
+.theme-label { color: var(--muted); margin-left: 8px; }
+
+
+
+
+/* Fallback variable overrides using html[data-theme] to avoid ::root selector issues */
+html[data-theme="light"] {
+    --bg: #ffffff;
+    --text: #111111;
+    --muted: #666666;
+    --panel: #f7f7f8;
+    --panel-contrast: #f0f0f0;
+    --border: #dddddd;
+    --hover: #e6e6e6;
+    --accent: #007bff;
+    --accent-contrast: #ffffff;
+    --danger: #dc3545;
+    --success: #28a745;
+    --warning: #ffc107;
+    --info: #17a2b8;
+}
+html[data-theme="dark"] {
+    --bg: #0f1115;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --panel: #161923;
+    --panel-contrast: #11141c;
+    --border: #2a2f3a;
+    --hover: #242a36;
+    --accent: #4da3ff;
+    --accent-contrast: #0b0d12;
+    --danger: #ff6b81;
+    --success: #4fd27a;
+    --warning: #ffd166;
+    --info: #5ccfe6;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* Dark theme toolbar tweak: make toolbar background slightly lighter */
+html[data-theme="dark"] .toolbar {
+    background-color: var(--panel);
+}
+
+/* Tree view (left menu) */
+#menu ul.tree-level { list-style: none; margin: 0; padding-left: 0; }
+#menu ul.tree-level[data-depth="0"] { padding-left: 0; }
+#menu ul.tree-level:not([data-depth="0"]) { padding-left: 16px; }
+#menu li.folder.collapsed > ul { display: none; }
+#menu .caret { width: 1em; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; user-select: none; }
+#menu .caret.placeholder { visibility: hidden; }
+#menu .folder-item .folder-name { flex: 1; }
+
+
+/* Header logo adjustments */
+.title-pane { display: flex; align-items: center; }
+.title-pane img { height: 32px; display: block; }

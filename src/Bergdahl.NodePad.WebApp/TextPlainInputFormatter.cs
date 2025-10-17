@@ -1,6 +1,8 @@
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Formatters;
 
+namespace Bergdahl.NodePad.WebApp;
+
 public class TextPlainInputFormatter : InputFormatter
 {
     public TextPlainInputFormatter()
