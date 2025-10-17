@@ -1,6 +1,7 @@
 bin/
 .idea/
 obj/
+publish/
 
 .DS_Store
 

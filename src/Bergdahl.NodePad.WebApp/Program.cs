@@ -1,4 +1,5 @@
 using Bergdahl.NodePad.WebApp;
+using Bergdahl.NodePad.WebApp.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
@@ -10,6 +11,10 @@ builder.Services.AddControllers(options =>
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
+
+// Bind file logger options and register file logger provider via DI (avoid BuildServiceProvider)
+builder.Services.Configure<FileLoggerOptions>(builder.Configuration.GetSection("Logging:File"));
+builder.Services.AddSingleton<ILoggerProvider, FileLoggerProvider>();
 
 var app = builder.Build();
 
