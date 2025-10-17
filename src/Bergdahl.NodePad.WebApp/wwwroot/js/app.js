@@ -11,6 +11,81 @@ const btnDelete = document.getElementById('btn-delete');
 // Breadcrumbs
 const breadcrumbsEl = document.getElementById('breadcrumbs');
 
+// Tags UI elements
+const tagsBar = document.getElementById('tags-bar');
+const tagsView = document.getElementById('tags-view');
+const tagsEdit = document.getElementById('tags-edit');
+const tagsInput = document.getElementById('tags-input');
+
+async function fetchMetaTags(path) {
+    try {
+        const res = await fetch(`/api/pages/meta?path=${encodeURIComponent(path)}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (Array.isArray(data)) return data;
+        // Fallback if server ever returns CSV string
+        if (typeof data === 'string') return data.split(',').map(t => t.trim()).filter(Boolean);
+        return [];
+    } catch { return []; }
+}
+
+function renderTagsChips(tags) {
+    if (!tagsView) return;
+    const items = (tags && tags.length) ? tags : [];
+    if (items.length === 0) {
+        tagsView.innerHTML = '<span class="tag-chip" title="No tags">No tags</span>';
+        return;
+    }
+    // Render each tag as a selectable chip; mark selected if it is part of the active tagFilter
+    const active = new Set(tagFilter.map(normalizeTag));
+    tagsView.innerHTML = items.map(t => {
+        const norm = normalizeTag(t);
+        const selClass = active.has(norm) ? ' selected' : '';
+        return `<span class="tag-chip selectable${selClass}" data-tag="${norm}" title="Filter by tag: ${t}">${t}</span>`;
+    }).join(' ');
+}
+
+async function updateTagsUI() {
+    if (!tagsBar) return;
+    const hasFile = !!currentPath;
+    tagsBar.style.display = hasFile ? 'block' : 'none';
+    if (!hasFile) return;
+
+    const tags = await fetchMetaTags(currentPath);
+    if (isEditMode) {
+        if (tagsEdit) tagsEdit.style.display = 'block';
+        if (tagsView) tagsView.style.display = 'none';
+        if (tagsInput) tagsInput.value = (tags || []).join(', ');
+    } else {
+        if (tagsEdit) tagsEdit.style.display = 'none';
+        if (tagsView) tagsView.style.display = 'flex';
+        renderTagsChips(tags || []);
+    }
+}
+
+// Make page tags clickable to apply filter
+if (tagsView) {
+    tagsView.addEventListener('click', (e) => {
+        const chip = e.target.closest('.tag-chip.selectable');
+        if (!chip) return;
+        const t = normalizeTag(chip.getAttribute('data-tag'));
+        const set = new Set(tagFilter);
+        if (set.has(t)) set.delete(t); else set.add(t);
+        tagFilter = Array.from(set);
+        // Refresh tags UI to reflect selected state
+        updateTagsUI();
+        // Re-render menu with filter applied
+        if (window.__lastStructure) {
+            const data = window.__lastStructure;
+            const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
+            menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>` + renderTagFilterBar();
+            attachTagFilterEvents();
+        } else {
+            loadMenu();
+        }
+    });
+}
+
 // Theme switcher
 const themeSelect = document.getElementById('theme-select');
 const prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -101,7 +176,7 @@ const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 
 // Toast UI Viewer/Editor helpers with theme support
-const DEFAULT_WELCOME = 'Welcome to NodePad!\n\nSelect a file from the menu or create a new one.';
+const DEFAULT_WELCOME = '<h1>Welcome to NodePad!</h1>Select a file from the menu or create a new one.';
 let viewer = null;
 function createViewer(initialMarkdown) {
     const mode = getEffectiveTheme();
@@ -324,6 +399,8 @@ function updateToolbar() {
     }
     // Keep breadcrumbs in sync with current selection
     renderBreadcrumbs();
+    // Keep tags UI in sync
+    updateTagsUI();
 }
 
 btnCreateFile.addEventListener('click', async function() {
@@ -334,7 +411,7 @@ btnCreateFile.addEventListener('click', async function() {
         }
     }
 
-    const name = await showModal('Create New File', 'Enter the name of the file:', true);
+    const name = await showModal('Create New Document', 'Enter the name of the document:', true);
     if (!name) return;
 
     const finalName = name.endsWith('.md') ? name : `${name}.md`;
@@ -344,7 +421,7 @@ btnCreateFile.addEventListener('click', async function() {
 });
 
 btnCreateFolder.addEventListener('click', async function() {
-    const name = await showModal('Create New Folder', 'Enter the name of the folder:', true);
+    const name = await showModal('Create New Node', 'Enter the name of the node:', true);
     if (!name) return;
 
     const createPath = currentFolderPath ? `${currentFolderPath}/${name}` : name;
@@ -362,8 +439,8 @@ btnEdit.addEventListener('click', function() {
 
     const editorContainer = document.createElement('div');
     editorContainer.id = 'editor-edit';
-    const toolbar = document.querySelector('.toolbar');
-    toolbar.parentNode.insertBefore(editorContainer, toolbar.nextSibling);
+    const editorEl = document.getElementById('editor');
+    editorEl.parentNode.insertBefore(editorContainer, editorEl);
 
     // Skapa editor med syntax highlighting
     editor = new toastui.Editor({
@@ -422,7 +499,7 @@ btnDelete.addEventListener('click', async function() {
                 // If current file is inside this folder, clear it
                 if (currentPath && (currentPath === selectedFolderPath || currentPath.startsWith(selectedFolderPath + '/'))) {
                     currentPath = '';
-                    currentContent = 'Welcome to NodePad!\n\nSelect a file from the menu or create a new one.';
+                    currentContent = DEFAULT_WELCOME;
                     viewer.setMarkdown(currentContent);
                     if (isEditMode) cancelEdit();
                 }
@@ -443,7 +520,7 @@ btnDelete.addEventListener('click', async function() {
                     }
                     if (currentPath && (currentPath === selectedFolderPath || currentPath.startsWith(selectedFolderPath + '/'))) {
                         currentPath = '';
-                        currentContent = 'Welcome to NodePad!\n\nSelect a file from the menu or create a new one.';
+                        currentContent = DEFAULT_WELCOME;
                         viewer.setMarkdown(currentContent);
                         if (isEditMode) cancelEdit();
                     }
@@ -469,7 +546,7 @@ btnDelete.addEventListener('click', async function() {
                     }
                     if (currentPath && (currentPath === selectedFolderPath || currentPath.startsWith(selectedFolderPath + '/'))) {
                         currentPath = '';
-                        currentContent = 'Welcome to NodePad!\n\nSelect a file from the menu or create a new one.';
+                        currentContent = DEFAULT_WELCOME;
                         viewer.setMarkdown(currentContent);
                         if (isEditMode) cancelEdit();
                     }
@@ -505,11 +582,141 @@ btnDelete.addEventListener('click', async function() {
     }
 });
 
+// Tag filtering state and index
+let tagsIndex = {}; // path -> [tags]
+let allKnownTags = new Map();
+let tagFilter = []; // active filter tags (lowercased)
+let tagsIndexBuilding = false;
+
+function normalizeTag(t){ return (t || '').trim().toLowerCase(); }
+
+function renderTagFilterBar() {
+    // Build a sorted array of [norm, display] pairs
+    const pairs = Array.from(allKnownTags.entries())
+        .map(([norm, display]) => [norm, display || norm])
+        .sort((a, b) => a[1].localeCompare(b[1]));
+    const active = new Set(tagFilter.map(normalizeTag));
+    const chipsHtml = pairs.length ? (
+        `<div class="tag-suggestions" id="tag-suggestions">` +
+        pairs.map(([norm, display])=>{
+            const sel = active.has(norm) ? ' selected' : '';
+            return `<span class="tag-suggestion${sel}" data-tag="${norm}" title="Toggle filter: ${display}">${display}</span>`;
+        }).join(' ') +
+        `</div>`
+    ) : '<div class="tag-suggestions" id="tag-suggestions"><span class="menu-filter-label">No tags indexed yet</span></div>';
+    return `
+    <div class="menu-filter-bar">
+        <div class="menu-filter-label">Filter by tag</div>
+        ${chipsHtml}
+    </div>`;
+}
+
+function attachTagFilterEvents() {
+    const sugg = document.getElementById('tag-suggestions');
+
+    if (sugg) {
+        sugg.addEventListener('click', (e) => {
+            const item = e.target.closest('.tag-suggestion');
+            if (!item) return;
+            const t = normalizeTag(item.getAttribute('data-tag'));
+            const set = new Set(tagFilter);
+            if (set.has(t)) {
+                set.delete(t);
+            } else {
+                set.add(t);
+            }
+            tagFilter = Array.from(set);
+            if (window.__lastStructure) {
+                const data = window.__lastStructure;
+                const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
+                menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>` + renderTagFilterBar();
+                attachTagFilterEvents();
+            }
+        });
+    }
+}
+
+function collectFilesFromStructure(nodes, acc) {
+    for (const n of nodes) {
+        if (n.type === 'file') acc.push(n.path);
+        if (n.children && n.children.length) collectFilesFromStructure(n.children, acc);
+    }
+    return acc;
+}
+
+async function buildTagsIndexFromStructure(structure) {
+    if (tagsIndexBuilding) return;
+    tagsIndexBuilding = true;
+    try {
+        const files = collectFilesFromStructure(structure, []);
+        const results = await Promise.all(files.map(async (p) => {
+            try {
+                const origTags = await fetchMetaTags(p);
+                const normTags = (origTags || []).map(normalizeTag);
+                return [p, { orig: origTags || [], norm: normTags }];
+            } catch { return [p, { orig: [], norm: [] }]; }
+        }));
+        tagsIndex = {};
+        allKnownTags = new Map();
+        for (const [p, pair] of results) {
+            const normList = pair.norm;
+            tagsIndex[p] = normList;
+            // Map normalized tag to a representative original label (first seen wins)
+            for (let i = 0; i < pair.orig.length; i++) {
+                const norm = pair.norm[i];
+                const display = pair.orig[i];
+                if (norm && !allKnownTags.has(norm)) allKnownTags.set(norm, display);
+            }
+        }
+    } finally {
+        tagsIndexBuilding = false;
+    }
+}
+
+function filterTreeByTags(nodes, requiredTags) {
+    // returns new pruned tree
+    const req = (requiredTags || []).map(normalizeTag);
+    function matches(path) {
+        const tags = tagsIndex[path] || [];
+        return req.every(t => tags.includes(t));
+    }
+    function recur(list) {
+        const out = [];
+        for (const node of list) {
+            if (node.type === 'file') {
+                if (!req.length || matches(node.path)) out.push(node);
+            } else {
+                const children = node.children ? recur(node.children) : [];
+                if (children.length) {
+                    out.push({ ...node, children });
+                }
+            }
+        }
+        return out;
+    }
+    return recur(nodes);
+}
+
 function loadMenu() {
     return fetch('/api/pages/structure')
         .then(res => res.json())
-        .then(data => {
-            menu.innerHTML = renderTree(data);
+        .then(async data => {
+            window.__lastStructure = data;
+            // build tags index in background if empty
+            if (Object.keys(tagsIndex).length === 0 && !tagsIndexBuilding) {
+                buildTagsIndexFromStructure(data).then(() => {
+                    // After building, re-render to reflect suggestions and filtering
+                    if (window.__lastStructure) {
+                        const d = window.__lastStructure;
+                        const t = (tagFilter.length) ? filterTreeByTags(d, tagFilter) : d;
+                        menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(t)}</div>` + renderTagFilterBar();
+                        attachTagFilterEvents();
+                    }
+                });
+            }
+            const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
+            menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>` + renderTagFilterBar();
+            attachTagFilterEvents();
             return data;
         })
         .catch(error => {
@@ -647,7 +854,7 @@ menu.addEventListener('click', function(e) {
 });
 
 function createEntity(createPath, type) {
-    const entityName = type === 'file' ? 'file' : 'folder';
+    const displayEntity = type === 'file' ? 'Document' : 'Node';
 
     fetch(`/api/pages/create?path=${encodeURIComponent(createPath)}&type=${type}`, {
         method: 'POST',
@@ -664,19 +871,27 @@ function createEntity(createPath, type) {
             expandAncestorsForPath(createPath, type !== 'file');
 
             if (type === 'file') {
-                showToast(`${entityName.charAt(0).toUpperCase() + entityName.slice(1)} created successfully`, 'success');
+                showToast(`${displayEntity} created successfully`, 'success');
+                // Initialize tags index for new file with empty tag list
+                if (createPath) {
+                    tagsIndex[createPath] = [];
+                }
                 // Loading the file will also refresh the menu (and keep it expanded)
-                loadFile(createPath);
+                // Then automatically enter edit mode for the new page
+                loadFile(createPath).then(() => {
+                    // Trigger the same logic as clicking the Edit button
+                    if (btnEdit) btnEdit.click();
+                });
             } else {
-                // For a new folder, expand and re-render the menu
+                // For a new folder (node), expand and re-render the menu
                 return loadMenu().then(() => {
-                    showToast(`${entityName.charAt(0).toUpperCase() + entityName.slice(1)} created successfully`, 'success');
+                    showToast(`${displayEntity} created successfully`, 'success');
                 });
             }
         })
         .catch(error => {
             console.error('Error creating entity:', error);
-            showToast(`Failed to create ${entityName}: ${error.message}`, 'error');
+            showToast(`Failed to create ${displayEntity}: ${error.message}`, 'error');
         });
 }
 
@@ -691,7 +906,7 @@ function deleteEntity(name, type, path) {
 
             if (path === currentPath) {
                 currentPath = '';
-                currentContent = 'Welcome to NodePad!\n\nSelect a file from the menu or create a new one.';
+                currentContent = DEFAULT_WELCOME;
                 viewer.setMarkdown(currentContent);
 
                 if (isEditMode) {
@@ -701,6 +916,8 @@ function deleteEntity(name, type, path) {
                 updateToolbar();
             }
 
+            // remove from tags index
+            try { if (path) { delete tagsIndex[path]; } } catch {}
             loadMenu();
             showToast('File deleted successfully', 'success');
         })
@@ -762,9 +979,16 @@ async function saveFile() {
     }
 
     try {
-        const content = editor.getMarkdown();
+        let content = editor.getMarkdown();
+        // Collect tags from input but let the server merge them into the markdown
+        let tagsParam = '';
+        let tagsArray = [];
+        if (tagsInput) {
+            tagsArray = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+            tagsParam = `&tags=${encodeURIComponent(tagsArray.join(', '))}`;
+        }
 
-        const response = await fetch(`/api/pages/save?path=${encodeURIComponent(currentPath)}`, {
+        const response = await fetch(`/api/pages/save?path=${encodeURIComponent(currentPath)}${tagsParam}`, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: content
@@ -774,10 +998,41 @@ async function saveFile() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        const savedContent = await response.text();
         showToast('File saved successfully!', 'success');
 
-        currentContent = content;
-        originalContent = content;
+        // Update tags index for this file using the tags we just sent (or refetch from meta)
+        try {
+            let updatedOrigTags = tagsArray;
+            if (!updatedOrigTags || updatedOrigTags.length === 0) {
+                updatedOrigTags = await fetchMetaTags(currentPath);
+            }
+            const updatedNormTags = (updatedOrigTags || []).map(normalizeTag);
+            tagsIndex[currentPath] = updatedNormTags;
+            // Update known tags map with original-cased labels (add new ones)
+            for (let i = 0; i < updatedNormTags.length; i++) {
+                const norm = updatedNormTags[i];
+                const display = updatedOrigTags[i];
+                if (norm && display && !allKnownTags.has(norm)) {
+                    allKnownTags.set(norm, display);
+                }
+            }
+            // Prune tags that are no longer used by any file
+            const present = new Set();
+            for (const p in tagsIndex) {
+                const list = tagsIndex[p] || [];
+                for (const t of list) present.add(t);
+            }
+            // Remove non-present tags from the active filter selection
+            tagFilter = (tagFilter || []).filter(t => present.has(t));
+            // Drop unused tags from the known tags map so filter chips update
+            for (const key of Array.from(allKnownTags.keys())) {
+                if (!present.has(key)) allKnownTags.delete(key);
+            }
+        } catch {}
+
+        currentContent = savedContent;
+        originalContent = savedContent;
 
         editor.destroy();
         editor = null;
@@ -785,10 +1040,25 @@ async function saveFile() {
         if (editorEdit) editorEdit.remove();
 
         document.querySelector('#editor').style.display = 'block';
-        viewer.setMarkdown(content);
+        viewer.setMarkdown(savedContent);
 
         isEditMode = false;
         updateToolbar();
+
+        // Re-render the menu filter bar so new/changed tags appear immediately
+        try {
+            if (window.__lastStructure) {
+                const data = window.__lastStructure;
+                const tree = (tagFilter.length && Object.keys(tagsIndex).length)
+                    ? filterTreeByTags(data, tagFilter)
+                    : data;
+                menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>` + renderTagFilterBar();
+                attachTagFilterEvents();
+            } else {
+                // Fallback: reload menu if cached structure is missing
+                loadMenu();
+            }
+        } catch {}
 
     } catch (error) {
         console.error('Error saving file:', error);

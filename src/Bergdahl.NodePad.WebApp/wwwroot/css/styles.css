@@ -93,9 +93,16 @@ body, html {
     background-color: var(--panel);
     border-right: 1px solid var(--border);
     padding: 15px;
-    overflow-y: auto;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     font-size: 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scrollable tree area inside the menu */
+.menu-tree {
+    flex: 1 1 auto;
+    overflow-y: auto;
 }
 
 #menu ul {
@@ -160,6 +167,53 @@ body, html {
     vertical-align: middle;
     cursor: pointer;
 }
+
+/* Tag filter bar at bottom of menu */
+.menu-filter-bar {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+.menu-filter-label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+.menu-filter-row {
+    display: flex;
+    gap: 6px;
+}
+.menu-filter-input {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+}
+.tag-suggestions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-suggestion {
+    background-color: var(--hover);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.tag-suggestion:not(.selected):hover { background-color: var(--panel-contrast); }
+/* Selected state for filter chips (invert unselected colors) */
+.tag-suggestion.selected,
+.tag-chip.selected {
+    background-color: var(--text);
+    color: var(--hover);
+    border-color: var(--text);
+}
+
+
+/* Make page tag chips clickable for filtering */
+.tag-chip.selectable { cursor: pointer; }
+.tag-chip.selectable:not(.selected):hover { background-color: var(--panel-contrast); }
 
 /* Ensure icons are visible on dark theme */
 html[data-theme="dark"] #menu .icon {
@@ -236,6 +290,37 @@ html[data-theme="dark"] #menu .icon {
     min-height: 0; /* Viktigt för att förhindra overflow */
     overflow: auto;
     padding: 15px;
+}
+
+/* Tags bar under breadcrumbs */
+.tags-bar {
+    padding: 6px 12px;
+    background-color: var(--panel);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.tags-view { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag-chip {
+    background-color: var(--hover);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+}
+.tags-edit { width: 100%; max-width: 600px; }
+.tags-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
 }
 
 /* Säkerställ att Toast UI Editor inte blir för bred */
@@ -334,6 +419,11 @@ button:active:not(:disabled) {
     background-color: #5a6268;
 }
 
+/* Align Save & Cancel to the right in the toolbar by pushing Save to the flex end */
+.toolbar #btn-save {
+    margin-left: auto;
+}
+
 #btn-delete {
     background-color: #dc3545;
 }
@@ -344,9 +434,6 @@ button:active:not(:disabled) {
 
 
 
-.selected {
-    background-color: var(--hover) !important;
-}
 
 /* Toast UI Editor custom styling */
 .toastui-editor-defaultUI {
@@ -580,10 +667,16 @@ button:active:not(:disabled) {
 }
 
 
-/* Toolbar right side theme switcher */
+/* Toolbar alignment rules */
 .toolbar {
     justify-content: flex-start;
 }
+/* Push Edit button to far right in view mode */
+.toolbar #btn-edit { margin-left: auto; }
+/* Keep Save aligned right in edit mode */
+.toolbar #btn-save { margin-left: auto; }
+
+/* Toolbar right side theme switcher */
 .toolbar-spacer { margin-left: auto; }
 .theme-select {
     background: var(--panel);
@@ -656,5 +749,39 @@ html[data-theme="dark"] .toolbar {
 
 
 /* Header logo adjustments */
-.title-pane { display: flex; align-items: center; }
+.title-pane { display: flex; align-items: center; justify-content: space-between; }
 .title-pane img { height: 32px; display: block; }
+.title-pane .title-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.title-pane .theme-label { color: var(--accent-contrast); }
+
+
+/* Light theme: ensure selected tag chips have light text on dark background */
+:root[data-theme="light"] .tag-suggestion.selected,
+:root[data-theme="light"] .tag-chip.selected {
+    color: #ffffff;
+}
+
+/* System light preference when no explicit dark override */
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .tag-suggestion.selected,
+    :root:not([data-theme="dark"]) .tag-chip.selected {
+        color: #ffffff;
+    }
+}
+
+
+/* Selected state styling for menu items (files and folders) */
+#menu .menu-item.selected {
+    background-color: var(--accent);
+    color: var(--accent-contrast);
+    border-radius: 4px;
+}
+#menu .menu-item.selected a.file-link {
+    color: var(--accent-contrast);
+    text-decoration: none;
+}
+#menu .menu-item.selected .folder-name { color: var(--accent-contrast); }
+#menu .menu-item.selected .caret { color: var(--accent-contrast); }
+#menu .menu-item.selected .icon { filter: invert(1) brightness(1.2); }
+/* Prevent hover from altering selected appearance */
+#menu .menu-item.selected:hover { background-color: var(--accent); }
