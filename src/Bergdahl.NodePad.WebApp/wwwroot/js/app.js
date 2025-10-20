@@ -668,8 +668,9 @@ if (btnRename) btnRename.addEventListener('click', async function() {
         if (input === null) return;
         let newName = (input || '').trim();
         if (!newName) return;
-        // Prevent slashes in the name; server will also validate
-        newName = newName.replace(/[\\/]+/g, '');
+        // Normalize: if a full path was pasted, take only the last segment; server will also validate
+        newName = newName.split(/[\\/]+/).filter(Boolean).pop() || '';
+        if (!newName) return;
         const resp = await fetch(`/api/pages/rename?path=${encodeURIComponent(oldPath)}&newName=${encodeURIComponent(newName)}`, { method: 'POST' });
         if (!resp.ok) { throw new Error(`HTTP ${resp.status}`); }
         const data = await resp.json().catch(() => ({}));

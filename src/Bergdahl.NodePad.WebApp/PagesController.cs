@@ -631,9 +631,10 @@ public class PagesController: ControllerBase
             var oldDirFull = Path.GetFullPath(Path.Combine(rootPath, sanitized));
             if (!oldDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid path");
             if (!Directory.Exists(oldDirFull)) return NotFound();
-            // New name sanitize - no slashes
+            // New name sanitize - collapse to last segment; reject empty
             newName = newName.Replace("..", string.Empty).Replace("\\", "/");
-            if (string.IsNullOrWhiteSpace(newName) || newName.Contains('/')) return BadRequest("Invalid new name");
+            if (newName.Contains('/')) newName = newName.Split('/').Last();
+            if (string.IsNullOrWhiteSpace(newName)) return BadRequest("Invalid new name");
             var parent = Path.GetDirectoryName(oldDirFull) ?? rootFull;
             var newDirFull = Path.GetFullPath(Path.Combine(parent, newName));
             if (!newDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid new name");
