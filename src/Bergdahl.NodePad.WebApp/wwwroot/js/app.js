@@ -7,6 +7,7 @@ const btnEdit = document.getElementById('btn-edit');
 const btnSave = document.getElementById('btn-save');
 const btnCancel = document.getElementById('btn-cancel');
 const btnDelete = document.getElementById('btn-delete');
+const btnRename = document.getElementById('btn-rename');
 
 
 // Breadcrumbs
@@ -142,6 +143,7 @@ function applyToastUITheme() {
         const editorContainer = document.getElementById('editor-edit');
         const height = editorContainer ? editorContainer.style.height || 'calc(100vh - 250px)' : 'calc(100vh - 250px)';
         editor.destroy();
+        const _csp = resolveCodeSyntaxPlugin();
         editor = new toastui.Editor({
             el: editorContainer,
             initialEditType: 'markdown',
@@ -149,7 +151,7 @@ function applyToastUITheme() {
             height,
             initialValue: md,
             theme: mode === 'dark' ? 'dark' : 'default',
-            plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]],
+            plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
             hooks: {
                 addImageBlobHook: async (blob, callback) => {
                     try {
@@ -196,6 +198,25 @@ prefersDarkQuery.addEventListener('change', () => {
 
 initTheme();
 
+// Resolve Toast UI Code Syntax Highlight plugin from various possible globals (CDN variants)
+function resolveCodeSyntaxPlugin() {
+    try {
+        const t = window.toastui;
+        if (t && t.Editor && t.Editor.plugin && t.Editor.plugin.codeSyntaxHighlight) {
+            return t.Editor.plugin.codeSyntaxHighlight;
+        }
+        // Some CDN builds expose the plugin as a standalone global
+        if (window.toastuiEditorPluginCodeSyntaxHighlight) {
+            return window.toastuiEditorPluginCodeSyntaxHighlight;
+        }
+        // Older builds may expose under EditorPlugin namespace
+        if (t && t.EditorPlugin && t.EditorPlugin.codeSyntaxHighlight) {
+            return t.EditorPlugin.codeSyntaxHighlight;
+        }
+    } catch (e) { /* ignore */ }
+    return null;
+}
+
 // Modal elements
 const modalOverlay = document.getElementById('modal-overlay');
 const modalTitle = document.getElementById('modal-title');
@@ -211,12 +232,13 @@ let viewer = null;
 function createViewer(initialMarkdown) {
     const mode = getEffectiveTheme();
     const el = document.querySelector('#editor');
+    const _csp = resolveCodeSyntaxPlugin();
     viewer = new toastui.Editor.factory({
         el,
         viewer: true,
         initialValue: typeof initialMarkdown === 'string' ? initialMarkdown : DEFAULT_WELCOME,
         theme: mode === 'dark' ? 'dark' : 'default',
-        plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]]
+        plugins: _csp ? [[_csp, { highlighter: Prism }]] : []
     });
 }
 
@@ -426,6 +448,7 @@ function updateToolbar() {
         btnSave.style.display = 'none';
         btnCancel.style.display = 'none';
         btnDelete.style.display = (currentPath || selectedFolderPath) ? 'inline-flex' : 'none';
+        if (btnRename) btnRename.style.display = (currentPath || selectedFolderPath) ? 'inline-flex' : 'none';
     }
     // Keep breadcrumbs in sync with current selection
     renderBreadcrumbs();
@@ -473,6 +496,7 @@ btnEdit.addEventListener('click', function() {
     editorEl.parentNode.insertBefore(editorContainer, editorEl);
 
     // Skapa editor med syntax highlighting
+    const _csp = resolveCodeSyntaxPlugin();
     editor = new toastui.Editor({
         el: editorContainer,
         initialEditType: 'markdown',
@@ -480,7 +504,7 @@ btnEdit.addEventListener('click', function() {
         height: 'calc(100vh - 250px)',
         initialValue: currentContent,
         theme: getEffectiveTheme() === 'dark' ? 'dark' : 'default',
-        plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]],
+        plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
         hooks: {
             addImageBlobHook: async (blob, callback) => {
                 try {
@@ -628,6 +652,56 @@ btnDelete.addEventListener('click', async function() {
 
     if (confirmed === true) {
         deleteEntity(fileName, 'file', currentPath);
+    }
+});
+
+if (btnRename) btnRename.addEventListener('click', async function() {
+    try {
+        if (!(currentPath || selectedFolderPath)) {
+            showToast('No file or folder selected', 'warning');
+            return;
+        }
+        const renamingFolder = !!selectedFolderPath;
+        const oldPath = renamingFolder ? selectedFolderPath : currentPath;
+        const defaultName = renamingFolder ? (oldPath.split('/').pop() || '') : ((oldPath.split('/').pop() || '').replace(/\.md$/i, ''));
+        const input = await showModal('Rename', `Enter a new name for ${renamingFolder ? 'folder' : 'file'}:`, true, defaultName);
+        if (input === null) return;
+        let newName = (input || '').trim();
+        if (!newName) return;
+        // Prevent slashes in the name; server will also validate
+        newName = newName.replace(/[\\/]+/g, '');
+        const resp = await fetch(`/api/pages/rename?path=${encodeURIComponent(oldPath)}&newName=${encodeURIComponent(newName)}`, { method: 'POST' });
+        if (!resp.ok) { throw new Error(`HTTP ${resp.status}`); }
+        const data = await resp.json().catch(() => ({}));
+        const newPath = (data && data.path) ? data.path : (renamingFolder ? oldPath : oldPath.replace(/[^/]+$/, (m) => newName.endsWith('.md') ? newName : (newName + '.md')));
+        if (renamingFolder) {
+            if (currentPath) {
+                if (currentPath === oldPath) {
+                    currentPath = '';
+                } else if (currentPath.startsWith(oldPath + '/')) {
+                    currentPath = newPath + currentPath.substring(oldPath.length);
+                }
+            }
+            selectedFolderPath = newPath;
+            currentFolderPath = newPath;
+        } else {
+            if (currentPath === oldPath) {
+                try {
+                    if (tagsIndex && tagsIndex[oldPath]) {
+                        tagsIndex[newPath] = tagsIndex[oldPath];
+                        delete tagsIndex[oldPath];
+                    }
+                } catch {}
+                currentPath = newPath;
+            }
+        }
+        try { expandAncestorsForPath(newPath, renamingFolder); } catch {}
+        await loadMenu();
+        updateToolbar();
+        showToast('Renamed successfully', 'success');
+    } catch (err) {
+        console.error('Rename failed', err);
+        showToast(`Rename failed: ${err.message}`, 'error');
     }
 });
 

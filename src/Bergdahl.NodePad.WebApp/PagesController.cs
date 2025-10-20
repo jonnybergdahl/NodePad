@@ -590,4 +590,69 @@ public class PagesController: ControllerBase
 
         return files.Concat(directories);
     }
+
+    [HttpPost("rename")]
+    public IActionResult Rename([FromQuery] string path, [FromQuery] string newName)
+    {
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(newName))
+            return BadRequest("Path and newName are required");
+        try
+        {
+            // Try as file first
+            var oldFileFull = GetSafePath(path);
+            var rootFull = Path.GetFullPath(rootPath);
+            if (oldFileFull != null && System.IO.File.Exists(oldFileFull))
+            {
+                // Ensure new name is a simple filename
+                newName = newName.Replace("..", string.Empty).Replace("\\", "/");
+                if (newName.Contains('/')) newName = newName.Split('/').Last();
+                if (!newName.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) newName += ".md";
+                var dir = Path.GetDirectoryName(oldFileFull) ?? rootFull;
+                var newFull = Path.GetFullPath(Path.Combine(dir, newName));
+                if (!newFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid new name");
+                if (System.IO.File.Exists(newFull)) return BadRequest("A file with the new name already exists");
+                // Move markdown
+                System.IO.File.Move(oldFileFull, newFull);
+                // Move meta if present
+                try
+                {
+                    var oldMeta = GetMetaPath(oldFileFull);
+                    var newMeta = GetMetaPath(newFull);
+                    if (System.IO.File.Exists(oldMeta)) System.IO.File.Move(oldMeta, newMeta);
+                }
+                catch { }
+                var relNew = Path.GetRelativePath(rootPath, newFull).Replace("\\", "/");
+                _logger.LogInformation("File renamed: {Old} -> {New}", path, relNew);
+                return Ok(new { oldPath = path.Replace("\\", "/"), path = relNew, type = "file" });
+            }
+
+            // Treat as directory
+            var sanitized = path.Replace("..", string.Empty).Replace("\\", "/");
+            var oldDirFull = Path.GetFullPath(Path.Combine(rootPath, sanitized));
+            if (!oldDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid path");
+            if (!Directory.Exists(oldDirFull)) return NotFound();
+            // New name sanitize - no slashes
+            newName = newName.Replace("..", string.Empty).Replace("\\", "/");
+            if (string.IsNullOrWhiteSpace(newName) || newName.Contains('/')) return BadRequest("Invalid new name");
+            var parent = Path.GetDirectoryName(oldDirFull) ?? rootFull;
+            var newDirFull = Path.GetFullPath(Path.Combine(parent, newName));
+            if (!newDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid new name");
+            if (Directory.Exists(newDirFull)) return BadRequest("A folder with the new name already exists");
+            Directory.Move(oldDirFull, newDirFull);
+            var relNewDir = Path.GetRelativePath(rootPath, newDirFull).Replace("\\", "/");
+            var relOldDir = Path.GetRelativePath(rootPath, oldDirFull).Replace("\\", "/");
+            _logger.LogInformation("Directory renamed: {Old} -> {New}", relOldDir, relNewDir);
+            return Ok(new { oldPath = relOldDir, path = relNewDir, type = "directory" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "Access denied when renaming: {Path}", path);
+            return StatusCode(403, "Access denied");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error renaming: {Path}", path);
+            return StatusCode(500, "Internal server error");
+        }
+    }
 }
