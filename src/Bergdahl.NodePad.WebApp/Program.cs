@@ -1,5 +1,7 @@
 using Bergdahl.NodePad.WebApp;
 using Bergdahl.NodePad.WebApp.Logging;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
@@ -30,6 +32,20 @@ else
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+// Serve PagesDirectory under /pages for embedded assets (images placed next to markdown files)
+var pagesDir = builder.Configuration.GetValue<string>("PagesDirectory") ?? Path.Combine(Directory.GetCurrentDirectory(), "Pages");
+var pagesFullPath = Path.GetFullPath(pagesDir);
+if (!Directory.Exists(pagesFullPath))
+{
+    Directory.CreateDirectory(pagesFullPath);
+}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(pagesFullPath),
+    RequestPath = "/pages",
+});
+
 app.MapControllers();
 
 app.Run();

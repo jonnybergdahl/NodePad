@@ -36,14 +36,22 @@
 <body>
 <div class="title-pane">
     <img src="/assets/nodepad_logo.png" alt="NodePad" />
-    <div class="title-actions">
-        <label for="theme-select" class="theme-label">Theme:</label>
-        <select id="theme-select" class="theme-select" title="Switch theme">
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-        </select>
+
+    <div class="title-search">
+        <input id="search-input" class="title-search-input" type="text" placeholder="Search..." title="Search notes" />
+        <button id="search-button" class="title-search-button" title="Search">🔍</button>
     </div>
+
+    <div class="title-right">
+        <div class="theme-switcher">
+            <select id="theme-select" class="theme-select" title="Switch theme">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+            </select>
+        </div>
+    </div>
+    <!-- Anchored search results panel (inside title pane for anchoring) -->
+    <div id="search-results" class="search-results" aria-live="polite" aria-label="Search results" hidden></div>
 </div>
 <div id="container">
     <div id="menu"></div>
@@ -90,7 +98,7 @@
 <div id="toast-container"></div>
 
 <div id="footer">
-    - NodePad - Copyright© 2024 Jonny Bergdahl. - This project is open source -
+    - NodePad - Copyright© 2025 Jonny Bergdahl. - This project is open source -
     <a href="https://github.com/jonnybergdahl/NodePad" target="_blank" rel="noreferrer">Checkout our GitHub repository</a> -
 </div>
 

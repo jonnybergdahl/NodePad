@@ -317,6 +317,92 @@ public class PagesController: ControllerBase
         }
     }
 
+    [HttpGet("search")]
+    public IActionResult Search([FromQuery] string query)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
+            {
+                return BadRequest("Query must be at least 2 characters long");
+            }
+
+            var q = query.Trim();
+            var results = new List<object>();
+            var files = Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories);
+            foreach (var file in files)
+            {
+                string rel = Path.GetRelativePath(rootPath, file).Replace("\\", "/");
+                string name = Path.GetFileNameWithoutExtension(file);
+                string content = string.Empty;
+                try { content = System.IO.File.ReadAllText(file); } catch { /* ignore unreadable files */ }
+
+                bool match = false;
+                int idx = -1;
+                // Match on file name or relative path
+                if (name.Contains(q, StringComparison.OrdinalIgnoreCase) || rel.Contains(q, StringComparison.OrdinalIgnoreCase))
+                {
+                    match = true;
+                }
+                // Match on content
+                if (!match && !string.IsNullOrEmpty(content))
+                {
+                    idx = content.IndexOf(q, StringComparison.OrdinalIgnoreCase);
+                    match = idx >= 0;
+                }
+
+                if (!match) continue;
+
+                // Title: first H1 if present, otherwise filename
+                string title = name;
+                try
+                {
+                    var lines = content?.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                    var h1 = lines.FirstOrDefault(l => l.TrimStart().StartsWith("# "));
+                    if (!string.IsNullOrWhiteSpace(h1))
+                    {
+                        title = h1.TrimStart().TrimStart('#').Trim();
+                    }
+                }
+                catch { /* ignore */ }
+
+                // Snippet around first match in content (or filename)
+                string snippet = "";
+                if (idx >= 0 && !string.IsNullOrEmpty(content))
+                {
+                    int start = Math.Max(0, idx - 40);
+                    int len = Math.Min(content.Length - start, 160);
+                    snippet = content.Substring(start, len).Replace('\n', ' ').Replace('\r', ' ');
+                    if (start > 0) snippet = "…" + snippet;
+                    if (start + len < content.Length) snippet += "…";
+                }
+                else if (name.Contains(q, StringComparison.OrdinalIgnoreCase))
+                {
+                    snippet = $"Match in file name: {name}.md";
+                }
+                else if (rel.Contains(q, StringComparison.OrdinalIgnoreCase))
+                {
+                    snippet = $"Match in path: {rel}";
+                }
+
+                results.Add(new { path = rel, title, snippet });
+            }
+
+            // Limit to first 100 results to keep payload small
+            return Ok(results.Take(100));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "Access denied during search");
+            return StatusCode(403, "Access denied");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during search");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     private string? GetSafePath(string userPath)
     {
         // Ta bort farliga tecken

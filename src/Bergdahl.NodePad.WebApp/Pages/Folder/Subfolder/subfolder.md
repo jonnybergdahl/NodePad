@@ -1,7 +1,6 @@
-# Subfolder
+# Subfolder content
 
 This is a subfolder note.
-And this is a new line.
 
 # What is Lorem Ipsum?
 

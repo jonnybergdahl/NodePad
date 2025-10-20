@@ -1,4 +1,5 @@
 # Home
-Tags: Hello, Hallo
 
-This is the index page
+![NodePad_Logo_Text_256.png](/pages/NodePad_Logo_Text_256.png)
+
+This is the index page.

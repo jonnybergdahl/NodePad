@@ -8,6 +8,7 @@ const btnSave = document.getElementById('btn-save');
 const btnCancel = document.getElementById('btn-cancel');
 const btnDelete = document.getElementById('btn-delete');
 
+
 // Breadcrumbs
 const breadcrumbsEl = document.getElementById('breadcrumbs');
 
@@ -112,9 +113,16 @@ function getEffectiveTheme() {
 }
 
 function initTheme() {
-    const saved = localStorage.getItem('theme') || 'system';
-    applyTheme(saved);
-    if (themeSelect) themeSelect.value = saved;
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+        applyTheme(saved);
+        if (themeSelect) themeSelect.value = saved;
+    } else {
+        // No saved preference: follow system
+        applyTheme(); // removes override
+        const effective = prefersDarkQuery.matches ? 'dark' : 'light';
+        if (themeSelect) themeSelect.value = effective;
+    }
 }
 
 function applyToastUITheme() {
@@ -141,7 +149,26 @@ function applyToastUITheme() {
             height,
             initialValue: md,
             theme: mode === 'dark' ? 'dark' : 'default',
-            plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]]
+            plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]],
+            hooks: {
+                addImageBlobHook: async (blob, callback) => {
+                    try {
+                        const fd = new FormData();
+                        fd.append('image', blob, blob.name || 'image');
+                        const resp = await fetch(`/api/uploads/images?pagePath=${encodeURIComponent(currentPath || '')}`, { method: 'POST', body: fd });
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        const data = await resp.json();
+                        if (data && data.url) {
+                            callback(data.url, blob.name || 'image');
+                        } else {
+                            throw new Error('Invalid response');
+                        }
+                    } catch (err) {
+                        console.error('Image upload failed', err);
+                        if (typeof showToast === 'function') showToast('Image upload failed', 'danger');
+                    }
+                }
+            }
         });
     }
 }
@@ -155,11 +182,14 @@ if (themeSelect) {
     });
 }
 
-// Update if system preference changes while in system mode
+// Update if system preference changes while following system (no explicit choice saved)
 prefersDarkQuery.addEventListener('change', () => {
-    const current = localStorage.getItem('theme') || 'system';
-    if (current === 'system') {
-        applyTheme('system');
+    const saved = localStorage.getItem('theme');
+    if (!saved) {
+        applyTheme();
+        // Also update the select to reflect the new effective theme
+        const effective = prefersDarkQuery.matches ? 'dark' : 'light';
+        if (themeSelect) themeSelect.value = effective;
         applyToastUITheme();
     }
 });
@@ -450,7 +480,26 @@ btnEdit.addEventListener('click', function() {
         height: 'calc(100vh - 250px)',
         initialValue: currentContent,
         theme: getEffectiveTheme() === 'dark' ? 'dark' : 'default',
-        plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]]
+        plugins: [[toastui.Editor.plugin.codeSyntaxHighlight, { highlighter: Prism }]],
+        hooks: {
+            addImageBlobHook: async (blob, callback) => {
+                try {
+                    const fd = new FormData();
+                    fd.append('image', blob, blob.name || 'image');
+                    const resp = await fetch(`/api/uploads/images?pagePath=${encodeURIComponent(currentPath || '')}`, { method: 'POST', body: fd });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (data && data.url) {
+                        callback(data.url, blob.name || 'image');
+                    } else {
+                        throw new Error('Invalid response');
+                    }
+                } catch (err) {
+                    console.error('Image upload failed', err);
+                    if (typeof showToast === 'function') showToast('Image upload failed', 'danger');
+                }
+            }
+        }
     });
 
     originalContent = currentContent;
@@ -1077,3 +1126,98 @@ window.addEventListener('beforeunload', function(e) {
 initDefaultPage();
 updateToolbar();
 loadMenu();
+// Search UI and logic
+(function(){
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    const searchResults = document.getElementById('search-results');
+    if (!searchInput || !searchButton) return;
+
+    let outsideClickHandler = null;
+    let escapeHandler = null;
+
+    function showAnchoredResults(q, items){
+        if (!searchResults) return;
+        const html = ['<ul>',
+            ...items.map(it => {
+                const title = (it.title || it.path || '').toString();
+                const path = (it.path || '').toString();
+                const snippet = (it.snippet || '').toString();
+                return `<li data-path="${path}">`+
+                       `<div class="result-title">${escapeHtml(title)}</div>`+
+                       `<div class="result-path">${escapeHtml(path)}</div>`+
+                       (snippet ? `<div class="result-snippet">${escapeHtml(snippet)}</div>` : '')+
+                       `</li>`;
+            }),
+            '</ul>'].join('');
+        searchResults.innerHTML = html;
+        searchResults.hidden = false;
+        searchResults.classList.remove('hidden');
+
+        // Attach handlers
+        searchResults.addEventListener('click', onResultClick);
+        outsideClickHandler = (ev)=>{
+            const within = ev.target.closest('#search-results') || ev.target.closest('.title-search');
+            if (!within) closeAnchoredResults();
+        };
+        escapeHandler = (ev)=>{ if (ev.key === 'Escape') closeAnchoredResults(); };
+        window.addEventListener('click', outsideClickHandler, { capture: true });
+        window.addEventListener('keydown', escapeHandler);
+    }
+
+    function closeAnchoredResults(){
+        if (!searchResults) return;
+        searchResults.hidden = true;
+        searchResults.classList.add('hidden');
+        searchResults.innerHTML = '';
+        searchResults.removeEventListener('click', onResultClick);
+        if (outsideClickHandler) window.removeEventListener('click', outsideClickHandler, { capture: true });
+        if (escapeHandler) window.removeEventListener('keydown', escapeHandler);
+        outsideClickHandler = null;
+        escapeHandler = null;
+    }
+
+    async function performSearch() {
+        const q = (searchInput.value || '').trim();
+        if (q.length < 2) {
+            showToast('Please enter at least 2 characters to search.', 'info');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/pages/search?query=${encodeURIComponent(q)}`);
+            if (!res.ok) {
+                showToast(`Search failed (${res.status})`, 'error');
+                return;
+            }
+            const items = await res.json();
+            if (!Array.isArray(items) || items.length === 0) {
+                // Show an empty state anchored panel
+                showAnchoredResults(q, [{ title: 'No results', path: '', snippet: `No matches for "${q}".` }]);
+                return;
+            }
+            showAnchoredResults(q, items);
+        } catch (e) {
+            console.error('Search error', e);
+            showToast('Search error. See console for details.', 'error');
+        }
+    }
+
+    function onResultClick(e) {
+        const li = e.target.closest('li[data-path]');
+        if (!li) return;
+        const path = li.getAttribute('data-path');
+        if (!path) { return; }
+        // Expand ancestors in the tree and load the file
+        try { expandAncestorsForPath(path, false); } catch {}
+        loadMenu();
+        closeAnchoredResults();
+        loadFile(path);
+    }
+
+    function escapeHtml(str){
+        return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+    }
+
+    searchButton.addEventListener('click', performSearch);
+    searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ performSearch(); }});
+})();

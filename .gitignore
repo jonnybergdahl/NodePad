@@ -1,8 +1,16 @@
 bin/
 .idea/
+.junie/
+.publish/
 obj/
 publish/
+Backups/
+Logs/
 
 .DS_Store
 
+*.user
 *.zip
+
+# Runtime uploaded assets
+src/Bergdahl.NodePad.WebApp/wwwroot/uploads/
