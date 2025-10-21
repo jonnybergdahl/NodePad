@@ -17,7 +17,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 
 - Browse your notes in a simple, clean interface
 - Write notes in Markdown format with preview
-- Organize notes in folders, just like on your computer
+- Organize notes in folders, with drag&drop support
 - Add tags to notes and quickly filter by tag
 - Add images to your notes
 - Search notes by title or content
