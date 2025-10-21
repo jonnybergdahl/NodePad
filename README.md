@@ -1,6 +1,6 @@
 # NodePad
 
-A fast, lightweight notes app that uses plain Markdown files. Create, organize, and edit your notes in the browser — your content stays as simple .md files on your disk.
+A fast, lightweight notes web app that uses plain Markdown files. Create, organize, and edit your notes in the browser — your content stays as simple .md files on your disk.
 
 <p align="center">
   <img src="src/Bergdahl.NodePad.WebApp/wwwroot/assets/nodepad_logo.png" alt="NodePad logo" width="240" />
@@ -15,11 +15,13 @@ A fast, lightweight notes app that uses plain Markdown files. Create, organize, 
 
 ## What you can do with NodePad
 
-- Write and format notes with Markdown
+- Browse your notes in a simple, clean interface
+- Write notes in Markdown format with preview
 - Organize notes in folders, just like on your computer
 - Add tags to notes and quickly filter by tag
-- Paste or drag-and-drop images — they are saved next to your note and just work
-- Switch themes: System, Light, or Dark
+- Add images to your notes
+- Search notes by title or content
+- Switch themes: Light, or Dark
 - Enjoy automatic, lightweight backups of your notes folder
 
 ## Quick start

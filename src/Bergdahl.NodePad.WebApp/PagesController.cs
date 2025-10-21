@@ -591,6 +591,92 @@ public class PagesController: ControllerBase
         return files.Concat(directories);
     }
 
+    [HttpPost("move")]
+    public IActionResult Move([FromQuery] string source, [FromQuery] string destination)
+    {
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(destination))
+            return BadRequest("Source and destination are required");
+        try
+        {
+            var rootFull = Path.GetFullPath(rootPath);
+
+            // First, try moving a file
+            var sourceFileFull = GetSafePath(source);
+            if (sourceFileFull != null && System.IO.File.Exists(sourceFileFull))
+            {
+                // Destination is interpreted as a directory under root
+                var destSanitized = destination.Replace("..", string.Empty).Replace("\\", "/");
+                var destDirFull = Path.GetFullPath(Path.Combine(rootPath, destSanitized));
+                if (!destDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid destination");
+                if (!Directory.Exists(destDirFull)) return NotFound("Destination folder not found");
+
+                var fileName = Path.GetFileName(sourceFileFull);
+                if (!fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Enforce .md extension
+                    fileName += ".md";
+                }
+                var destFileFull = Path.GetFullPath(Path.Combine(destDirFull, fileName));
+                if (!destFileFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid destination");
+                if (System.IO.File.Exists(destFileFull)) return Conflict("A file with the same name already exists in the destination");
+
+                System.IO.File.Move(sourceFileFull, destFileFull);
+                // Move meta if present
+                try
+                {
+                    var oldMeta = GetMetaPath(sourceFileFull);
+                    var newMeta = GetMetaPath(destFileFull);
+                    if (System.IO.File.Exists(oldMeta)) System.IO.File.Move(oldMeta, newMeta);
+                }
+                catch { }
+
+                var oldRel = Path.GetRelativePath(rootPath, sourceFileFull).Replace("\\", "/");
+                var newRel = Path.GetRelativePath(rootPath, destFileFull).Replace("\\", "/");
+                _logger.LogInformation("File moved: {Old} -> {New}", oldRel, newRel);
+                return Ok(new { oldPath = oldRel, path = newRel, type = "file" });
+            }
+
+            // Otherwise, treat as directory move
+            var srcSan = source.Replace("..", string.Empty).Replace("\\", "/");
+            var srcDirFull = Path.GetFullPath(Path.Combine(rootPath, srcSan));
+            if (!srcDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid source");
+            if (!Directory.Exists(srcDirFull)) return NotFound("Source folder not found");
+
+            var dstSan = destination.Replace("..", string.Empty).Replace("\\", "/");
+            var dstDirFull2 = Path.GetFullPath(Path.Combine(rootPath, dstSan));
+            if (!dstDirFull2.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid destination");
+            if (!Directory.Exists(dstDirFull2)) return NotFound("Destination folder not found");
+
+            // Prevent moving a directory into itself or its descendant
+            var normSrc = srcDirFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var normDst = dstDirFull2.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (normDst.StartsWith(normSrc, StringComparison.OrdinalIgnoreCase)) return BadRequest("Cannot move a folder into itself or its subfolder");
+
+            var folderName = Path.GetFileName(srcDirFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (string.IsNullOrEmpty(folderName)) return BadRequest("Invalid source folder");
+            var newDirFull = Path.GetFullPath(Path.Combine(dstDirFull2, folderName));
+            if (!newDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) return BadRequest("Invalid destination");
+            if (Directory.Exists(newDirFull)) return Conflict("A folder with the same name already exists in the destination");
+
+            Directory.Move(srcDirFull, newDirFull);
+
+            var oldDirRel = Path.GetRelativePath(rootPath, srcDirFull).Replace("\\", "/");
+            var newDirRel = Path.GetRelativePath(rootPath, newDirFull).Replace("\\", "/");
+            _logger.LogInformation("Directory moved: {Old} -> {New}", oldDirRel, newDirRel);
+            return Ok(new { oldPath = oldDirRel, path = newDirRel, type = "directory" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "Access denied when moving: {Source} -> {Destination}", source, destination);
+            return StatusCode(403, "Access denied");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error moving: {Source} -> {Destination}", source, destination);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     [HttpPost("rename")]
     public IActionResult Rename([FromQuery] string path, [FromQuery] string newName)
     {

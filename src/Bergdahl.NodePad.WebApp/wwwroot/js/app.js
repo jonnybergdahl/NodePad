@@ -927,12 +927,112 @@ function renderTree(nodes, depth = 0) {
             </div>`;
         const children = isFolder && hasChildren ? renderTree(node.children, depth + 1) : (isFolder ? '<ul class="tree-level empty" data-depth="' + (depth + 1) + '"></ul>' : '');
         return `
-        <li class="${liClasses}" data-path="${node.path}" data-type="${node.type}">
+        <li class="${liClasses}" data-path="${node.path}" data-type="${node.type}" draggable="true">
             ${item}
             ${children}
         </li>`;
     }).join('') + '</ul>';
 }
+
+// Drag and drop to move files and folders
+let __dragSource = null;
+let __dragSourceType = null;
+
+menu.addEventListener('dragstart', function(e){
+    const li = e.target.closest('li[data-path]');
+    if (!li) return;
+    __dragSource = li.getAttribute('data-path');
+    __dragSourceType = li.getAttribute('data-type');
+    try { e.dataTransfer.setData('text/plain', __dragSource); } catch {}
+});
+
+function getDropTargetDirPath(targetLi){
+    if (!targetLi) return '';
+    const type = targetLi.getAttribute('data-type');
+    const path = targetLi.getAttribute('data-path') || '';
+    if (type === 'directory') return path;
+    // if file, use its parent directory
+    const last = path.lastIndexOf('/');
+    return last >= 0 ? path.substring(0, last) : '';
+}
+
+function isValidMove(sourcePath, sourceType, destDir){
+    if (!sourcePath || destDir === null || destDir === undefined) return false;
+    // cannot move into same folder
+    const srcParent = sourcePath.includes('/') ? sourcePath.substring(0, sourcePath.lastIndexOf('/')) : '';
+    if (srcParent === destDir) return false;
+    // folders: prevent moving into itself or descendant
+    if (sourceType !== 'file'){
+        if (destDir === sourcePath) return false;
+        if (destDir.startsWith(sourcePath + '/')) return false;
+    }
+    return true;
+}
+
+menu.addEventListener('dragover', function(e){
+    const li = e.target.closest('li[data-path]');
+    if (!li) return;
+    const destDir = getDropTargetDirPath(li);
+    if (!__dragSource) return;
+    if (!isValidMove(__dragSource, __dragSourceType, destDir)) return;
+    e.preventDefault();
+    li.classList.add('drag-over');
+});
+
+menu.addEventListener('dragleave', function(e){
+    const li = e.target.closest('li[data-path]');
+    if (!li) return;
+    li.classList.remove('drag-over');
+});
+
+menu.addEventListener('drop', async function(e){
+    const li = e.target.closest('li[data-path]');
+    if (!li) return;
+    e.preventDefault();
+    const destDir = getDropTargetDirPath(li);
+    const src = __dragSource;
+    const srcType = __dragSourceType;
+    __dragSource = null; __dragSourceType = null;
+    // Clear highlights
+    try { document.querySelectorAll('#menu li.drag-over').forEach(el=>el.classList.remove('drag-over')); } catch {}
+    if (!src) return;
+    if (!isValidMove(src, srcType, destDir)) return;
+    try {
+        const resp = await fetch(`/api/pages/move?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(destDir)}`, { method: 'POST' });
+        if (!resp.ok) { throw new Error(`HTTP ${resp.status}`); }
+        const data = await resp.json().catch(()=>({}));
+        const newPath = data && data.path ? data.path : null;
+        const movedType = data && data.type ? data.type : srcType;
+        if (movedType === 'file'){
+            // Update currentPath if moved file was open
+            if (currentPath === src) {
+                currentPath = newPath || (destDir ? (destDir + '/' + (src.split('/').pop()||'')) : (src.split('/').pop()||''));
+            }
+            // Update tagsIndex key
+            try {
+                if (tagsIndex && tagsIndex[src]) { tagsIndex[currentPath] = tagsIndex[src]; delete tagsIndex[src]; }
+            } catch {}
+            try { expandAncestorsForPath(currentPath, false); } catch {}
+        } else {
+            // Folder moved: update selections
+            if (selectedFolderPath && (selectedFolderPath === src || selectedFolderPath.startsWith(src + '/'))){
+                if (newPath) selectedFolderPath = newPath; else selectedFolderPath = destDir ? (destDir + '/' + (src.split('/').pop()||'')) : (src.split('/').pop()||'');
+                currentFolderPath = selectedFolderPath;
+            }
+            if (currentPath && currentPath.startsWith(src + '/')){
+                const suffix = currentPath.substring(src.length);
+                currentPath = (newPath || (destDir + '/' + (src.split('/').pop()||''))) + suffix;
+            }
+            try { expandAncestorsForPath(selectedFolderPath, true); } catch {}
+        }
+        await loadMenu();
+        updateToolbar();
+        showToast('Moved successfully', 'success');
+    } catch (err) {
+        console.error('Move failed', err);
+        showToast(`Move failed: ${err.message}`, 'error');
+    }
+});
 
 menu.addEventListener('click', function(e) {
     // Toggle folder expand/collapse via caret or clicking folder row (except clicking actions/links)

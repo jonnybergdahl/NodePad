@@ -759,6 +759,8 @@ html[data-theme="dark"] .toolbar {
 #menu .caret.placeholder { visibility: hidden; }
 #menu .folder-item .folder-name { flex: 1; }
 
+/* Drag & Drop visual feedback */
+#menu li.drag-over > .menu-item { background-color: var(--panel-contrast); box-shadow: inset 0 0 0 2px var(--accent); }
 
 /* Header logo adjustments */
 .title-pane { position: relative; display: flex; align-items: center; justify-content: center; padding-right: 60px; min-height: 56px; }
