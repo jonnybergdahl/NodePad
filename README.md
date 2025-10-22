@@ -80,6 +80,9 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - How do I move my notes?
   - Close NodePad, copy the Pages folder to the new location, then start NodePad again.
 
+- How do I move a page to the root folder?
+  - In the left-hand tree, drag the page and drop it in the empty space below the list (not on a folder). This moves it to the root. You can also use the API: POST /api/pages/move?source=Folder/file.md&destination=
+
 - Do images overwrite if names match?
   - Yes. If you upload a file with the same name, it replaces the existing one in that note’s folder.
 
@@ -93,4 +96,13 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 ## License
 
 MIT © 2025 Jonny Bergdahl — see [LICENSE](LICENSE)
+
+
+
+## API
+
+The API documentation has moved to API.md. See:
+
+- API documentation: [API.md](API.md)
+
 

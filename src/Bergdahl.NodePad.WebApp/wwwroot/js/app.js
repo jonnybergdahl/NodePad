@@ -12,6 +12,7 @@ const btnRename = document.getElementById('btn-rename');
 
 // Breadcrumbs
 const breadcrumbsEl = document.getElementById('breadcrumbs');
+let serverBreadcrumbs = null;
 
 // Tags UI elements
 const tagsBar = document.getElementById('tags-bar');
@@ -76,15 +77,8 @@ if (tagsView) {
         tagFilter = Array.from(set);
         // Refresh tags UI to reflect selected state
         updateTagsUI();
-        // Re-render menu with filter applied
-        if (window.__lastStructure) {
-            const data = window.__lastStructure;
-            const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
-            menu.innerHTML = `<div id="menu-tree" class="menu-tree">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
-            attachTagFilterEvents();
-        } else {
-            loadMenu();
-        }
+        // Ask server for filtered/sorted structure
+        loadMenu();
     });
 }
 
@@ -382,6 +376,36 @@ function renderBreadcrumbs() {
         sep.className = 'sep';
         sep.textContent = '›';
         breadcrumbsEl.appendChild(sep);
+    }
+
+    // If server-provided breadcrumbs are available, render those and return
+    if (Array.isArray(serverBreadcrumbs) && serverBreadcrumbs.length > 0) {
+        for (let i = 0; i < serverBreadcrumbs.length; i++) {
+            const item = serverBreadcrumbs[i];
+            addSep();
+            const crumb = document.createElement('span');
+            crumb.className = 'crumb';
+            crumb.textContent = item.name || item.Name || '';
+            const isLast = i === serverBreadcrumbs.length - 1;
+            if (!isLast) {
+                crumb.addEventListener('click', () => {
+                    const p = (item.path || item.Path || '').replace(/\\/g, '/');
+                    selectedFolderPath = p;
+                    currentFolderPath = p;
+                    loadMenu();
+                    updateToolbar();
+                });
+            } else {
+                crumb.addEventListener('click', () => {
+                    const p = (item.path || item.Path || '').replace(/\\/g, '/');
+                    if (p && p.endsWith('.md')) {
+                        loadFile(p);
+                    }
+                });
+            }
+            breadcrumbsEl.appendChild(crumb);
+        }
+        return;
     }
 
     // Determine what path to render: prefer file path, else selected folder
@@ -772,26 +796,21 @@ async function buildTagsIndexFromStructure(structure) {
     if (tagsIndexBuilding) return;
     tagsIndexBuilding = true;
     try {
-        const files = collectFilesFromStructure(structure, []);
-        const results = await Promise.all(files.map(async (p) => {
-            try {
-                const origTags = await fetchMetaTags(p);
-                const normTags = (origTags || []).map(normalizeTag);
-                return [p, { orig: origTags || [], norm: normTags }];
-            } catch { return [p, { orig: [], norm: [] }]; }
-        }));
+        const res = await fetch('/api/pages/tags-index');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
         tagsIndex = {};
         allKnownTags = new Map();
-        for (const [p, pair] of results) {
-            const normList = pair.norm;
+        for (const [p, list] of Object.entries(data || {})) {
+            const normList = Array.isArray(list) ? list.map(normalizeTag) : [];
             tagsIndex[p] = normList;
-            // Map normalized tag to a representative original label (first seen wins)
-            for (let i = 0; i < pair.orig.length; i++) {
-                const norm = pair.norm[i];
-                const display = pair.orig[i];
-                if (norm && !allKnownTags.has(norm)) allKnownTags.set(norm, display);
+            for (const t of normList) {
+                if (t && !allKnownTags.has(t)) allKnownTags.set(t, t);
             }
         }
+    } catch (err) {
+        console.error('Failed to load tags index from server', err);
+        // keep existing tagsIndex as-is on failure
     } finally {
         tagsIndexBuilding = false;
     }
@@ -835,30 +854,44 @@ function sortTree(nodes) {
 }
 
 function loadMenu() {
-    return fetch('/api/pages/structure')
+    const params = new URLSearchParams();
+    params.set('sorted', 'true');
+    params.set('dirsFirst', 'true');
+    if (Array.isArray(tagFilter) && tagFilter.length > 0) {
+        const csv = tagFilter.map(normalizeTag).filter(Boolean).join(',');
+        if (csv) params.set('tags', csv);
+    }
+    return fetch(`/api/pages/structure?${params.toString()}`)
         .then(res => res.json())
         .then(async data => {
             window.__lastStructure = data;
             // build tags index in background if empty
             if (Object.keys(tagsIndex).length === 0 && !tagsIndexBuilding) {
-                buildTagsIndexFromStructure(data).then(() => {
-                    // After building, re-render to reflect suggestions and filtering
-                    if (window.__lastStructure) {
-                        const d = window.__lastStructure;
-                        const t = (tagFilter.length) ? filterTreeByTags(d, tagFilter) : d;
-                        menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(t))}</div>` + renderTagFilterBar();
-                        attachTagFilterEvents();
-                    }
-                });
+                buildTagsIndexFromStructure(data).catch(() => {});
             }
-            const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
-            menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
+            menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(data)}</div>` + renderTagFilterBar();
             attachTagFilterEvents();
+            try { attachRootDropzoneEvents(); } catch {}
             return data;
         })
         .catch(error => {
             console.error('Error loading menu:', error);
-            showToast('Failed to load menu', 'error');
+            // Fallback: attempt legacy fetch without server sort/filter
+            return fetch('/api/pages/structure')
+                .then(r => r.json())
+                .then(fallbackData => {
+                    window.__lastStructure = fallbackData;
+                    const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(fallbackData, tagFilter) : fallbackData;
+                    menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
+                    attachTagFilterEvents();
+                    try { attachRootDropzoneEvents(); } catch {}
+                    showToast && showToast('Using fallback menu rendering', 'warning');
+                    return fallbackData;
+                })
+                .catch(err2 => {
+                    console.error('Fallback menu load failed:', err2);
+                    showToast && showToast('Failed to load menu', 'error');
+                });
         });
 }
 
@@ -927,7 +960,7 @@ function renderTree(nodes, depth = 0) {
         const hasChildren = !!(node.children && node.children.length);
         const isSelected = isFolder ? (node.path === selectedFolderPath) : (!selectedFolderPath && node.path === currentPath);
         const liClasses = [isFolder ? 'folder' : 'file', expanded && isFolder ? 'expanded' : 'collapsed'].filter(Boolean).join(' ');
-        const caret = isFolder ? `<span class="caret" data-toggle="${node.path}" aria-label="Toggle" role="button">${expanded ? '▼' : '▶'}</span>` : '<span class="caret placeholder"></span>';
+        const caret = isFolder ? `<span class="caret" data-toggle="${node.path}" aria-label="Toggle" role="button">${expanded ? '▼' : '▶'}</span>` : '';
         const icon = isFolder ? '/assets/folder-outline.svg' : '/assets/file-outline.svg';
         const item = isFolder ?
             `<div class="menu-item folder-item ${isSelected ? 'selected' : ''}" data-folder-path="${node.path}">
@@ -982,14 +1015,68 @@ function isValidMove(sourcePath, sourceType, destDir){
     return true;
 }
 
+// Attach handlers for dedicated root drop zone
+function attachRootDropzoneEvents(){
+    const zone = document.getElementById('root-dropzone');
+    if (!zone) return;
+    const destDir = '';
+    function canDrop(){
+        return !!__dragSource && isValidMove(__dragSource, __dragSourceType, destDir);
+    }
+    zone.addEventListener('dragenter', function(e){
+        if (!canDrop()) return;
+        e.preventDefault();
+        zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragover', function(e){
+        if (!canDrop()) return;
+        e.preventDefault();
+        zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', function(){
+        zone.classList.remove('drag-over');
+    });
+    zone.addEventListener('drop', async function(e){
+        e.preventDefault();
+        const src = __dragSource;
+        const srcType = __dragSourceType;
+        __dragSource = null; __dragSourceType = null;
+        zone.classList.remove('drag-over');
+        if (!src) return;
+        if (!isValidMove(src, srcType, destDir)) return;
+        try {
+            const resp = await fetch(`/api/pages/move?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(destDir)}`, { method: 'POST' });
+            if (!resp.ok) { throw new Error(`HTTP ${resp.status}`); }
+            const data = await resp.json().catch(()=>({}));
+            const newPath = data && data.path ? data.path : null;
+            const movedType = data && data.type ? data.type : srcType;
+            if (movedType === 'file'){
+                if (currentPath === src) {
+                    currentPath = newPath || (src.split('/').pop()||'');
+                }
+                try { if (tagsIndex && tagsIndex[src]) { tagsIndex[currentPath] = tagsIndex[src]; delete tagsIndex[src]; } } catch {}
+                try { expandAncestorsForPath(currentPath, false); } catch {}
+            } else {
+                if (selectedFolderPath && (selectedFolderPath === src || selectedFolderPath.startsWith(src + '/'))){
+                    selectedFolderPath = '';
+                }
+            }
+            // Reload menu to reflect changes
+            try { await loadMenu(false, true); } catch {}
+        } catch (err){
+            console.error('Move to root failed', err);
+            showToast && showToast('Move failed', 'error');
+        }
+    });
+}
+
 menu.addEventListener('dragover', function(e){
     const li = e.target.closest('li[data-path]');
-    if (!li) return;
-    const destDir = getDropTargetDirPath(li);
+    const destDir = li ? getDropTargetDirPath(li) : '';
     if (!__dragSource) return;
     if (!isValidMove(__dragSource, __dragSourceType, destDir)) return;
     e.preventDefault();
-    li.classList.add('drag-over');
+    if (li) li.classList.add('drag-over');
 });
 
 menu.addEventListener('dragleave', function(e){
@@ -1000,14 +1087,14 @@ menu.addEventListener('dragleave', function(e){
 
 menu.addEventListener('drop', async function(e){
     const li = e.target.closest('li[data-path]');
-    if (!li) return;
     e.preventDefault();
-    const destDir = getDropTargetDirPath(li);
+    const destDir = li ? getDropTargetDirPath(li) : '';
     const src = __dragSource;
     const srcType = __dragSourceType;
     __dragSource = null; __dragSourceType = null;
     // Clear highlights
     try { document.querySelectorAll('#menu li.drag-over').forEach(el=>el.classList.remove('drag-over')); } catch {}
+    try { const rz = document.getElementById('root-dropzone'); if (rz) rz.classList.remove('drag-over'); } catch {}
     if (!src) return;
     if (!isValidMove(src, srcType, destDir)) return;
     try {
@@ -1181,11 +1268,21 @@ async function loadFile(path) {
     viewer.setMarkdown('Loading...');
 
     try {
-        const response = await fetch(`/api/pages/content?path=${encodeURIComponent(path)}`);
+        const response = await fetch(`/api/pages/content?path=${encodeURIComponent(path)}&includeMeta=true`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const content = await response.text();
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        let content = '';
+        if (contentType.includes('application/json')) {
+            const data = await response.json();
+            content = data && typeof data.content === 'string' ? data.content : '';
+            // Store server-provided breadcrumbs for renderBreadcrumbs()
+            serverBreadcrumbs = Array.isArray(data && data.breadcrumbs) ? data.breadcrumbs : null;
+        } else {
+            content = await response.text();
+            serverBreadcrumbs = null;
+        }
         currentContent = content;
         viewer.setMarkdown(content);
 

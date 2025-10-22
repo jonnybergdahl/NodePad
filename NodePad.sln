@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{47A33A91-F6B
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bergdahl.NodePad.WebApp", "src\Bergdahl.NodePad.WebApp\Bergdahl.NodePad.WebApp.csproj", "{4C117302-7985-4E41-90FF-CE5334B271BD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bergdahl.NodePad.WebApp.Tests", "src\Bergdahl.NodePad.WebApp.Tests\Bergdahl.NodePad.WebApp.Tests.csproj", "{52C1A177-6815-4787-9417-2A1E00F54196}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,12 +19,17 @@ Global
 		{4C117302-7985-4E41-90FF-CE5334B271BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C117302-7985-4E41-90FF-CE5334B271BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C117302-7985-4E41-90FF-CE5334B271BD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52C1A177-6815-4787-9417-2A1E00F54196}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52C1A177-6815-4787-9417-2A1E00F54196}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52C1A177-6815-4787-9417-2A1E00F54196}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52C1A177-6815-4787-9417-2A1E00F54196}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4C117302-7985-4E41-90FF-CE5334B271BD} = {47A33A91-F6B1-47C9-A067-1326D1A8BB58}
+		{52C1A177-6815-4787-9417-2A1E00F54196} = {47A33A91-F6B1-47C9-A067-1326D1A8BB58}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {494CD316-E57C-43E9-8B25-B66191472ECB}

@@ -756,11 +756,35 @@ html[data-theme="dark"] .toolbar {
 #menu ul.tree-level:not([data-depth="0"]) { padding-left: 16px; }
 #menu li.folder.collapsed > ul { display: none; }
 #menu .caret { width: 1em; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; user-select: none; }
-#menu .caret.placeholder { visibility: hidden; }
 #menu .folder-item .folder-name { flex: 1; }
 
 /* Drag & Drop visual feedback */
 #menu li.drag-over > .menu-item { background-color: var(--panel-contrast); box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* Root drop zone to move items to the root folder */
+#menu .root-dropzone {
+    margin: 0 0 8px 0;
+    min-height: 40px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    background: var(--panel);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 14px;
+    user-select: none;
+}
+#menu .root-dropzone::before {
+    content: 'Pages';
+}
+#menu .root-dropzone.drag-over {
+    background: var(--panel-contrast);
+    box-shadow: inset 0 0 0 2px var(--accent);
+    color: var(--text);
+}
 
 /* Header logo adjustments */
 .title-pane { position: relative; display: flex; align-items: center; justify-content: center; padding-right: 60px; min-height: 56px; }
