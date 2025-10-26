@@ -777,7 +777,8 @@ function attachTagFilterEvents() {
             if (window.__lastStructure) {
                 const data = window.__lastStructure;
                 const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
-                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
+                // Rely on server-side sorting; no client-side sorting applied
+                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
                 attachTagFilterEvents();
             }
         });
@@ -840,18 +841,7 @@ function filterTreeByTags(nodes, requiredTags) {
     return recur(nodes);
 }
 
-// Sort tree nodes alphabetically at each level; directories first, case-insensitive
-function sortTree(nodes) {
-    if (!Array.isArray(nodes)) return nodes;
-    const cloned = nodes.map(n => ({ ...n, children: n.children ? sortTree(n.children) : n.children }));
-    cloned.sort((a, b) => {
-        const aDir = a.type !== 'file' ? 0 : 1; // directory before file
-        const bDir = b.type !== 'file' ? 0 : 1;
-        if (aDir !== bDir) return aDir - bDir;
-        return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-    });
-    return cloned;
-}
+// Note: No client-side sorting. The backend returns the structure already sorted.
 
 function loadMenu() {
     const params = new URLSearchParams();
@@ -882,7 +872,8 @@ function loadMenu() {
                 .then(fallbackData => {
                     window.__lastStructure = fallbackData;
                     const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(fallbackData, tagFilter) : fallbackData;
-                    menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
+                    // Rely on backend ordering even in fallback; do not sort on client
+                    menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
                     attachTagFilterEvents();
                     try { attachRootDropzoneEvents(); } catch {}
                     showToast && showToast('Using fallback menu rendering', 'warning');
@@ -1386,7 +1377,8 @@ async function saveFile() {
                 const tree = (tagFilter.length && Object.keys(tagsIndex).length)
                     ? filterTreeByTags(data, tagFilter)
                     : data;
-                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(sortTree(tree))}</div>` + renderTagFilterBar();
+                // Rely on server-side sorting; no client-side sorting applied
+                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
                 attachTagFilterEvents();
             } else {
                 // Fallback: reload menu if cached structure is missing

@@ -869,21 +869,36 @@ public class PagesController: ControllerBase
         }
     }
 
-    private IEnumerable<FileSystemEntity> SortTree(IEnumerable<FileSystemEntity> nodes, bool dirsFirst)
+    private IEnumerable<FileSystemEntity> SortTree(IEnumerable<FileSystemEntity> nodes, bool dirsFirst, int depth = 0)
     {
         var list = nodes.Select(n => new FileSystemEntity
         {
             Name = n.Name,
             Path = n.Path,
             Type = n.Type,
-            Children = n.Children != null ? SortTree(n.Children, dirsFirst).ToList() : null
+            Children = n.Children != null ? SortTree(n.Children, dirsFirst, depth + 1).ToList() : null
         }).ToList();
 
         list.Sort((a, b) =>
         {
-            int dirRankA = string.Equals(a.Type, "file", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-            int dirRankB = string.Equals(b.Type, "file", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-            if (dirsFirst && dirRankA != dirRankB) return dirRankA - dirRankB;
+            // At the root level (depth == 0), put files before directories.
+            // For deeper levels, keep existing behavior controlled by dirsFirst.
+            bool aIsFile = string.Equals(a.Type, "file", StringComparison.OrdinalIgnoreCase);
+            bool bIsFile = string.Equals(b.Type, "file", StringComparison.OrdinalIgnoreCase);
+
+            if (depth == 0)
+            {
+                int rankA = aIsFile ? 0 : 1; // files first at root
+                int rankB = bIsFile ? 0 : 1;
+                if (rankA != rankB) return rankA - rankB;
+            }
+            else if (dirsFirst)
+            {
+                int rankA = aIsFile ? 1 : 0; // directories first below root
+                int rankB = bIsFile ? 1 : 0;
+                if (rankA != rankB) return rankA - rankB;
+            }
+            // Finally, name sort (case-insensitive)
             return string.Compare(a.Name ?? string.Empty, b.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         });
         return list;
