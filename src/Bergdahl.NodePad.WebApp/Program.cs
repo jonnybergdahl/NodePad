@@ -4,6 +4,9 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
+// Load external settings from nodepad.json to hold user-adjustable options
+builder.Configuration.AddJsonFile("nodepad.json", optional: true, reloadOnChange: true);
+
 builder.Services.AddControllers(options =>
 {
     options.InputFormatters.Add(new TextPlainInputFormatter());

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <None Include="wwwroot\index.html" />
+    <None Include="nodepad.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 
 </Project>

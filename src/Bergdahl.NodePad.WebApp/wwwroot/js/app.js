@@ -1498,3 +1498,80 @@ loadMenu();
     searchButton.addEventListener('click', performSearch);
     searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ performSearch(); }});
 })();
+
+
+// Settings UI logic
+(function(){
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsCloseBtn = document.getElementById('settings-close-btn');
+    const settingsCancelBtn = document.getElementById('settings-cancel-btn');
+    const settingsSaveBtn = document.getElementById('settings-save-btn');
+
+    const inputAllowedHosts = document.getElementById('settings-allowed-hosts');
+    const inputPagesDir = document.getElementById('settings-pages-dir');
+    const inputBackupDir = document.getElementById('settings-backup-dir');
+
+    let originalSettings = null;
+
+    function openSettings() {
+        settingsOverlay && settingsOverlay.classList.add('active');
+    }
+    function closeSettings() {
+        settingsOverlay && settingsOverlay.classList.remove('active');
+    }
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            if (!res.ok) throw new Error('Failed to load settings');
+            const data = await res.json();
+            originalSettings = data;
+            if (inputAllowedHosts) inputAllowedHosts.value = data.allowedHosts ?? data.AllowedHosts ?? '';
+            if (inputPagesDir) inputPagesDir.value = data.pagesDirectory ?? data.PagesDirectory ?? '';
+            if (inputBackupDir) inputBackupDir.value = data.backupDirectory ?? data.BackupDirectory ?? '';
+        } catch (err) {
+            showToast && showToast('Failed to load settings', 'error');
+        }
+    }
+
+    async function saveSettings() {
+        const payload = {
+            allowedHosts: inputAllowedHosts ? inputAllowedHosts.value : undefined,
+            pagesDirectory: inputPagesDir ? inputPagesDir.value : undefined,
+            backupDirectory: inputBackupDir ? inputBackupDir.value : undefined,
+        };
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error('Save failed');
+            const data = await res.json();
+            showToast && showToast('Settings saved', 'success');
+            // Warn about PagesDirectory change
+            const oldPages = originalSettings?.pagesDirectory ?? originalSettings?.PagesDirectory ?? '';
+            const newPages = data.pagesDirectory ?? data.PagesDirectory ?? '';
+            if (oldPages !== newPages) {
+                showToast && showToast('PagesDirectory changed. Restart the app to update static file serving.', 'warning');
+            }
+            closeSettings();
+        } catch (err) {
+            showToast && showToast('Failed to save settings', 'error');
+        }
+    }
+
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', async () => {
+            await loadSettings();
+            openSettings();
+        });
+    }
+    if (settingsCloseBtn) settingsCloseBtn.addEventListener('click', closeSettings);
+    if (settingsCancelBtn) settingsCancelBtn.addEventListener('click', closeSettings);
+    if (settingsOverlay) settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === settingsOverlay) closeSettings();
+    });
+    if (settingsSaveBtn) settingsSaveBtn.addEventListener('click', saveSettings);
+})();

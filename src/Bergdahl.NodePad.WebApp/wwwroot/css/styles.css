@@ -373,7 +373,7 @@ html[data-theme="dark"] #menu .icon {
 button {
     margin: 0;
     padding: 8px 16px;
-    background-color: var(--accent);
+    background-color: #3399ff; /* lighter blue */
     color: var(--accent-contrast);
     border: none;
     border-radius: 4px;
@@ -393,7 +393,7 @@ button:disabled {
 }
 
 button:hover:not(:disabled) {
-    background-color: #0056b3;
+    background-color: #5ab2ff; /* lighter hover */
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
@@ -404,19 +404,19 @@ button:active:not(:disabled) {
 
 /* Button variants */
 #btn-save {
-    background-color: #28a745;
+    background-color: #5cd17a; /* lighter green */
 }
 
 #btn-save:hover:not(:disabled) {
-    background-color: #218838;
+    background-color: #48c26a; /* lighter green hover */
 }
 
 #btn-cancel {
-    background-color: #6c757d;
+    background-color: #9aa3aa; /* lighter gray */
 }
 
 #btn-cancel:hover:not(:disabled) {
-    background-color: #5a6268;
+    background-color: #8a9399; /* lighter gray hover */
 }
 
 /* Align Save & Cancel to the right in the toolbar by pushing Save to the flex end */
@@ -425,11 +425,11 @@ button:active:not(:disabled) {
 }
 
 #btn-delete {
-    background-color: #dc3545;
+    background-color: #ff6b81; /* lighter red */
 }
 
 #btn-delete:hover:not(:disabled) {
-    background-color: #c82333;
+    background-color: #ff8596; /* lighter red hover */
 }
 
 
@@ -556,23 +556,23 @@ button:active:not(:disabled) {
 }
 
 .modal-btn-primary {
-    background-color: #007BFF;
-    color: white;
+    background-color: #66b3ff; /* lighter blue */
+    color: #0b0d12;
 }
 
 .modal-btn-primary:hover {
-    background-color: #0056b3;
+    background-color: #8cc8ff; /* lighter hover */
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .modal-btn-secondary {
-    background-color: #6c757d;
-    color: white;
+    background-color: #b0b7bd; /* lighter gray */
+    color: #0b0d12;
 }
 
 .modal-btn-secondary:hover {
-    background-color: #5a6268;
+    background-color: #c6cbd0; /* lighter gray hover */
 }
 
 /* Toast Notifications */
@@ -1070,3 +1070,22 @@ body, html {
 .title-pane .theme-switcher { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 14px; line-height: 1.2; }
 .title-pane .theme-switcher .theme-label { margin-left: 0; font-size: 12px; color: var(--accent-contrast); }
 .title-pane .theme-switcher .theme-select { font-size: 14px; }
+/* Settings button next to theme dropdown */
+.title-pane .settings-btn {
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 4px;
+    padding: 8px 16px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+.title-pane .settings-btn:hover {
+    border-color: #ffffff;
+}
+.title-pane .settings-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.25);
+}
+/* Settings modal field layout */
+#settings-overlay .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+#settings-overlay label { font-weight: 600; }
+#settings-overlay .hint { color: var(--muted); }

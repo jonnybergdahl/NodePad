@@ -43,6 +43,7 @@
     </div>
 
     <div class="title-right">
+        <button id="settings-btn" class="settings-btn" title="Settings">⚙️</button>
         <div class="theme-switcher">
             <select id="theme-select" class="theme-select" title="Switch theme">
                 <option value="light">Light</option>
@@ -74,6 +75,35 @@
             </div>
         </div>
         <div id="editor"></div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-overlay" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="settings-title">Settings</h3>
+            <button class="modal-close" id="settings-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row">
+                <label for="settings-allowed-hosts">Allowed Hosts</label>
+                <input type="text" id="settings-allowed-hosts" class="modal-input" placeholder="e.g. * or localhost;example.com">
+            </div>
+            <div class="form-row">
+                <label for="settings-pages-dir">Pages Directory</label>
+                <input type="text" id="settings-pages-dir" class="modal-input" placeholder="e.g. Pages or /absolute/path">
+                <small class="hint">Changing this may require restarting the app to serve static assets from /pages.</small>
+            </div>
+            <div class="form-row">
+                <label for="settings-backup-dir">Backup Directory</label>
+                <input type="text" id="settings-backup-dir" class="modal-input" placeholder="e.g. Backups or /absolute/path">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="settings-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
+            <button id="settings-save-btn" class="modal-btn modal-btn-primary">Save</button>
+        </div>
     </div>
 </div>
 

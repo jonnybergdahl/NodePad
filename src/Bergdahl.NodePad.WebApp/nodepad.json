@@ -1,0 +1,5 @@
+{
+  "AllowedHosts": "*",
+  "PagesDirectory": "Pages",
+  "BackupDirectory": "Backups"
+}
