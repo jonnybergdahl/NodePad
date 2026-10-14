@@ -12,4 +12,5 @@ NodePad is protected by a single account. Everything — the app, the API and yo
 Hosting in IIS
 - The app pool identity needs write access to the application folder: NodePad writes nodepad.json (settings), nodepad.auth.json (account), the Pages and Backups folders, and a Keys folder.
 - The Keys folder holds the keys used to protect sign-in cookies, so you stay signed in across app pool recycles. Its location can be changed with "DataProtectionKeysDirectory" in nodepad.json. Keep it private.
+- nodepad.json and nodepad.auth.json are not included when you publish NodePad, so deploying a new version keeps the server's settings and account.
 - Use HTTPS if NodePad is reachable from other machines, so passwords and cookies are not sent in clear text.

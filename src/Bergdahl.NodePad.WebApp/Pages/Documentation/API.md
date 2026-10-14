@@ -195,7 +195,8 @@ The frontend uses server-side endpoints for tags and filtered/sorted structure t
   - Returns { allowedHosts, pagesDirectory, backupDirectory } from nodepad.json.
 
 - POST /api/settings
-  - Body: { allowedHosts?, pagesDirectory?, backupDirectory? }. Only the given values are changed in nodepad.json, and missing directories are created.
+  - Body: { allowedHosts?, pagesDirectory?, backupDirectory? }. Only the given values are changed in nodepad.json, and missing directories are created. An empty value removes the setting, so the default is used.
+  - nodepad.json is created if it does not exist (it is not part of the published output).
   - Returns the updated settings. A changed Pages directory takes effect after a restart.
 
 ## Notes

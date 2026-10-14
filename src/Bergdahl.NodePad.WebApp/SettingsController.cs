@@ -47,36 +47,31 @@ public class SettingsController : ControllerBase
 
         try
         {
-            // Load existing nodepad.json
-            if (!System.IO.File.Exists(_settingsPath))
+            // Load existing nodepad.json; it is not published, so start a new one if it is missing
+            JsonObject? node = new JsonObject();
+            if (System.IO.File.Exists(_settingsPath))
             {
-                return StatusCode(500, "nodepad.json not found");
+                var json = System.IO.File.ReadAllText(_settingsPath);
+                node = JsonNode.Parse(json) as JsonObject;
+                if (node == null)
+                {
+                    return StatusCode(500, "Failed to parse nodepad.json");
+                }
             }
 
-            var json = System.IO.File.ReadAllText(_settingsPath);
-            var node = JsonNode.Parse(json) as JsonObject;
-            if (node == null)
-            {
-                return StatusCode(500, "Failed to parse nodepad.json");
-            }
-
-            // Update values if provided (allow empty string to be set explicitly)
-            if (input.AllowedHosts != null)
-                node["AllowedHosts"] = input.AllowedHosts;
-
-            if (input.PagesDirectory != null)
-                node["PagesDirectory"] = input.PagesDirectory;
-
-            if (input.BackupDirectory != null)
-                node["BackupDirectory"] = input.BackupDirectory;
+            // Update values if provided; a blank value removes the setting so the default is used
+            // (an empty AllowedHosts or PagesDirectory would otherwise break the app)
+            SetOrRemove(node, "AllowedHosts", input.AllowedHosts);
+            SetOrRemove(node, "PagesDirectory", input.PagesDirectory);
+            SetOrRemove(node, "BackupDirectory", input.BackupDirectory);
 
             // Persist back pretty-printed
             var options = new JsonSerializerOptions { WriteIndented = true };
             System.IO.File.WriteAllText(_settingsPath, node.ToJsonString(options));
 
             // Ensure directories exist if set
-            var pagesDir = input.PagesDirectory ?? _configuration["PagesDirectory"];
-            var backupDir = input.BackupDirectory ?? _configuration["BackupDirectory"];
+            var pagesDir = (string?)node["PagesDirectory"];
+            var backupDir = (string?)node["BackupDirectory"];
 
             if (!string.IsNullOrWhiteSpace(pagesDir))
             {
@@ -94,16 +89,16 @@ public class SettingsController : ControllerBase
             }
 
             _logger.LogInformation("Settings updated: AllowedHosts={AllowedHosts}, PagesDirectory={PagesDirectory}, BackupDirectory={BackupDirectory}",
-                input.AllowedHosts ?? _configuration["AllowedHosts"],
-                input.PagesDirectory ?? _configuration["PagesDirectory"],
-                input.BackupDirectory ?? _configuration["BackupDirectory"]);
+                (string?)node["AllowedHosts"],
+                (string?)node["PagesDirectory"],
+                (string?)node["BackupDirectory"]);
 
-            // Return the effective settings from configuration (may update after reloadOnChange)
+            // Return the settings as saved (the configuration only updates after reloadOnChange)
             return Ok(new AppSettingsDto
             {
-                AllowedHosts = input.AllowedHosts ?? _configuration["AllowedHosts"],
-                PagesDirectory = input.PagesDirectory ?? _configuration["PagesDirectory"],
-                BackupDirectory = input.BackupDirectory ?? _configuration["BackupDirectory"],
+                AllowedHosts = (string?)node["AllowedHosts"],
+                PagesDirectory = (string?)node["PagesDirectory"],
+                BackupDirectory = (string?)node["BackupDirectory"],
             });
         }
         catch (Exception ex)
@@ -111,5 +106,14 @@ public class SettingsController : ControllerBase
             _logger.LogError(ex, "Failed to save settings");
             return StatusCode(500, "Failed to save settings");
         }
+    }
+
+    private static void SetOrRemove(JsonObject node, string key, string? value)
+    {
+        if (value == null) return;
+        if (string.IsNullOrWhiteSpace(value))
+            node.Remove(key);
+        else
+            node[key] = value.Trim();
     }
 }

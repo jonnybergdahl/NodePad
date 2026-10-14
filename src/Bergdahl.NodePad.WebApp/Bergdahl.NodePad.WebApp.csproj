@@ -8,7 +8,10 @@
 
   <ItemGroup>
     <None Include="wwwroot\index.html" />
-    <None Include="nodepad.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+    <!-- Local settings; not published so a deploy never overwrites the server's own settings -->
+    <Content Update="nodepad.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <!-- The account file holds the password hash; never copy it to build or publish output -->
+    <Content Update="nodepad.auth.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>

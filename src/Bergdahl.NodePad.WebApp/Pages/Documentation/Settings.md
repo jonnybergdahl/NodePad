@@ -2,7 +2,7 @@
 
 Open Settings with the gear button in the top bar.
 
-- Settings tab: Allowed Hosts, the Pages directory and the Backup directory. These are saved to nodepad.json. Relative paths are relative to the folder NodePad runs from. A changed Pages directory takes effect after restarting NodePad.
+- Settings tab: Allowed Hosts, the Pages directory and the Backup directory. These are saved to nodepad.json, which is created the first time you save if it does not exist yet; until then the defaults are used (Pages and Backups next to the app). Leave a field empty to go back to its default. Relative paths are relative to the folder NodePad runs from. A changed Pages directory takes effect after restarting NodePad.
 - Password tab: change your password.
 - MCP Server tab: create or revoke the API key for AI assistants (MCP).
 

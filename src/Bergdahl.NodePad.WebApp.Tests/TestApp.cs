@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using Bergdahl.NodePad.WebApp.Auth;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bergdahl.NodePad.WebApp.Tests
@@ -29,12 +31,20 @@ namespace Bergdahl.NodePad.WebApp.Tests
             {
                 // Read before the app is built, so it has to be a host setting
                 builder.UseSetting("DataProtectionKeysDirectory", Path.Combine(Root, "Keys"));
-                // Added after nodepad.json, so these win over the project's own settings
-                builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+                builder.ConfigureAppConfiguration((_, config) =>
                 {
-                    ["PagesDirectory"] = PagesPath,
-                    ["BackupDirectory"] = Path.Combine(Root, "Backups"),
-                }));
+                    // Never read the account from a real nodepad.auth.json in the project folder
+                    var authSource = config.Sources.OfType<JsonConfigurationSource>()
+                        .FirstOrDefault(s => s.Path == CredentialStore.FileName);
+                    if (authSource != null) config.Sources.Remove(authSource);
+
+                    // Added after nodepad.json, so these win over the project's own settings
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["PagesDirectory"] = PagesPath,
+                        ["BackupDirectory"] = Path.Combine(Root, "Backups"),
+                    });
+                });
                 builder.ConfigureTestServices(services =>
                 {
                     // Never touch a real nodepad.auth.json

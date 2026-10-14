@@ -54,6 +54,7 @@ NodePad is protected by a single account. Everything — the app, the API and yo
 Hosting in IIS
 - The app pool identity needs write access to the application folder: NodePad writes nodepad.json (settings), nodepad.auth.json (account), the Pages and Backups folders, and a Keys folder.
 - The Keys folder holds the keys used to protect sign-in cookies, so you stay signed in across app pool recycles. Its location can be changed with "DataProtectionKeysDirectory" in nodepad.json. Keep it private.
+- nodepad.json and nodepad.auth.json are not included when you publish NodePad, so deploying a new version keeps the server's settings and account.
 - Use HTTPS if NodePad is reachable from other machines, so passwords and cookies are not sent in clear text.
 
 ## Using NodePad from Claude and other AI assistants (MCP)
@@ -107,7 +108,7 @@ The API key only grants access to /mcp, not to the rest of the app. Only a hash 
 
 Open Settings with the gear button in the top bar.
 
-- Settings tab: Allowed Hosts, the Pages directory and the Backup directory. These are saved to nodepad.json. Relative paths are relative to the folder NodePad runs from. A changed Pages directory takes effect after restarting NodePad.
+- Settings tab: Allowed Hosts, the Pages directory and the Backup directory. These are saved to nodepad.json, which is created the first time you save if it does not exist yet; until then the defaults are used (Pages and Backups next to the app). Leave a field empty to go back to its default. Relative paths are relative to the folder NodePad runs from. A changed Pages directory takes effect after restarting NodePad.
 - Password tab: change your password.
 - MCP Server tab: create or revoke the API key for AI assistants (MCP).
 
