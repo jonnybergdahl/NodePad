@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NodePad - Sign in</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <script>
+        // Apply the theme chosen in the main app before first paint
+        try {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+        } catch { }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <!-- Styles are inline: the regular stylesheet is only served to signed-in users -->
+    <style>
+        :root {
+            color-scheme: light;
+            --md-primary: #1565c0;
+            --md-on-primary: #ffffff;
+            --md-error: #ba1a1a;
+            --md-surface: #f8f9ff;
+            --md-surface-container: #eceef4;
+            --md-surface-container-low: #f2f3fa;
+            --md-on-surface: #191c20;
+            --md-on-surface-variant: #43474e;
+            --md-outline: #73777f;
+            --md-outline-variant: #c3c6cf;
+            --md-elevation-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --md-primary: #a9c7ff;
+                --md-on-primary: #003063;
+                --md-error: #ffb4ab;
+                --md-surface: #111318;
+                --md-surface-container: #1d2024;
+                --md-surface-container-low: #191c20;
+                --md-on-surface: #e1e2e9;
+                --md-on-surface-variant: #c3c6cf;
+                --md-outline: #8d9199;
+                --md-outline-variant: #43474e;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --md-primary: #a9c7ff;
+            --md-on-primary: #003063;
+            --md-error: #ffb4ab;
+            --md-surface: #111318;
+            --md-surface-container: #1d2024;
+            --md-surface-container-low: #191c20;
+            --md-on-surface: #e1e2e9;
+            --md-on-surface-variant: #c3c6cf;
+            --md-outline: #8d9199;
+            --md-outline-variant: #43474e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: var(--md-surface);
+            color: var(--md-on-surface);
+            font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+            line-height: 1.5;
+        }
+        .card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--md-surface-container-low);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 12px;
+            box-shadow: var(--md-elevation-1);
+            padding: 24px;
+        }
+        .brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 16px; font-size: 1.375rem; font-weight: 500; }
+        .brand img { width: 40px; height: 40px; }
+        h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 16px; text-align: center; }
+        p.intro { color: var(--md-on-surface-variant); font-size: 0.875rem; margin: -8px 0 16px; text-align: center; }
+        label { display: block; font-size: 0.875rem; color: var(--md-on-surface-variant); margin: 12px 0 4px; }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            height: 48px;
+            padding: 0 16px;
+            font: inherit;
+            border: 1px solid var(--md-outline);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--md-on-surface);
+        }
+        input[type="text"]:hover, input[type="password"]:hover { border-color: var(--md-on-surface); }
+        input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: var(--md-primary); box-shadow: inset 0 0 0 1px var(--md-primary); }
+        .remember { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+        .remember input { width: 18px; height: 18px; margin: 0; accent-color: var(--md-primary); }
+        .remember label { margin: 0; font-size: 1rem; color: var(--md-on-surface); }
+        button {
+            width: 100%;
+            height: 40px;
+            margin-top: 24px;
+            font: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: none;
+            border-radius: 999px;
+            background: var(--md-primary);
+            color: var(--md-on-primary);
+            cursor: pointer;
+        }
+        button:hover:not(:disabled) { box-shadow: var(--md-elevation-1); filter: brightness(1.08); }
+        button:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+        button:disabled { opacity: 0.38; cursor: default; }
+        .error { color: var(--md-error); font-size: 0.875rem; margin-top: 12px; min-height: 1.2em; }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+<main class="card">
+    <div class="brand">
+        <img src="/assets/nodepad_icon.png" alt="" width="40" height="40">
+        <span>NodePad</span>
+    </div>
+
+    <form id="login-form" novalidate hidden>
+        <h1>Sign in</h1>
+        <label for="login-username">Username</label>
+        <input id="login-username" type="text" autocomplete="username" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <div class="remember">
+            <input id="login-remember" type="checkbox">
+            <label for="login-remember">Keep me signed in</label>
+        </div>
+        <button type="submit">Sign in</button>
+    </form>
+
+    <form id="setup-form" novalidate hidden>
+        <h1>Create your account</h1>
+        <p class="intro">No account exists yet. Choose a username and password to protect your notes.</p>
+        <label for="setup-username">Username</label>
+        <input id="setup-username" type="text" autocomplete="username" required>
+        <label for="setup-password">Password (at least 6 characters)</label>
+        <input id="setup-password" type="password" autocomplete="new-password" minlength="6" required>
+        <label for="setup-confirm">Confirm password</label>
+        <input id="setup-confirm" type="password" autocomplete="new-password" minlength="6" required>
+        <button type="submit">Create account</button>
+    </form>
+
+    <div id="error" class="error" role="alert"></div>
+</main>
+
+<script>
+(function () {
+    const loginForm = document.getElementById('login-form');
+    const setupForm = document.getElementById('setup-form');
+    const errorEl = document.getElementById('error');
+
+    function returnUrl() {
+        const url = new URLSearchParams(location.search).get('ReturnUrl') || new URLSearchParams(location.search).get('returnUrl') || '/';
+        // Only allow local paths to avoid open redirects
+        return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\') ? url : '/';
+    }
+
+    async function post(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (res.ok) return null;
+        if (res.status === 429) return 'Too many attempts. Wait a minute and try again.';
+        try { return (await res.json()).error || `Request failed (${res.status})`; }
+        catch { return `Request failed (${res.status})`; }
+    }
+
+    async function submit(form, url, body) {
+        errorEl.textContent = '';
+        const button = form.querySelector('button');
+        button.disabled = true;
+        try {
+            const error = await post(url, body);
+            if (error) { errorEl.textContent = error; return; }
+            location.replace(returnUrl());
+        } catch {
+            errorEl.textContent = 'Could not reach the server.';
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    // Show validation problems in the page and focus the field, rather than relying on browser bubbles
+    function invalid(fieldId, message) {
+        errorEl.textContent = message;
+        document.getElementById(fieldId).focus();
+    }
+
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        if (!username) { invalid('login-username', 'Enter your username.'); return; }
+        if (!password) { invalid('login-password', 'Enter your password.'); return; }
+        submit(loginForm, '/api/auth/login', {
+            username,
+            password,
+            rememberMe: document.getElementById('login-remember').checked
+        });
+    });
+
+    setupForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('setup-username').value.trim();
+        const password = document.getElementById('setup-password').value;
+        if (!username) { invalid('setup-username', 'Choose a username.'); return; }
+        if (password.length < 6) { invalid('setup-password', 'The password must be at least 6 characters.'); return; }
+        if (password !== document.getElementById('setup-confirm').value) {
+            invalid('setup-confirm', 'The passwords do not match.');
+            return;
+        }
+        submit(setupForm, '/api/auth/setup', { username, password });
+    });
+
+    (async function init() {
+        try {
+            const res = await fetch('/api/auth/status');
+            const status = await res.json();
+            if (status.authenticated) { location.replace(returnUrl()); return; }
+            const form = status.configured ? loginForm : setupForm;
+            form.hidden = false;
+            form.querySelector('input').focus();
+        } catch {
+            errorEl.textContent = 'Could not reach the server.';
+        }
+    })();
+})();
+</script>
+</body>
+</html>

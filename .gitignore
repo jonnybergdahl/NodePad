@@ -6,6 +6,8 @@ obj/
 publish/
 Backups/
 Logs/
+Keys/
+nodepad.auth.json
 
 .DS_Store
 

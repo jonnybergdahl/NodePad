@@ -1,3 +1,14 @@
+// Send the user to the login page when the session is missing or has expired
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+    const response = await nativeFetch(...args);
+    if (response.status === 401) {
+        const returnUrl = location.pathname + location.search + location.hash;
+        location.href = `/login.html?returnUrl=${encodeURIComponent(returnUrl)}`;
+    }
+    return response;
+};
+
 const menu = document.getElementById('menu');
 
 // Toolbar buttons
@@ -83,7 +94,7 @@ if (tagsView) {
 }
 
 // Theme switcher
-const themeSelect = document.getElementById('theme-select');
+const themeToggle = document.getElementById('theme-toggle');
 const prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
 function applyTheme(mode) {
@@ -96,6 +107,16 @@ function applyTheme(mode) {
         // system: remove explicit override and rely on media query
         root.removeAttribute('data-theme');
     }
+    updateThemeToggle();
+}
+
+// The toggle shows the theme a click switches to
+function updateThemeToggle() {
+    if (!themeToggle) return;
+    const next = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
+    themeToggle.querySelector('.material-symbols-rounded').textContent = next === 'dark' ? 'dark_mode' : 'light_mode';
+    themeToggle.title = next === 'dark' ? 'Switch to dark theme' : 'Switch to light theme';
+    themeToggle.setAttribute('aria-label', themeToggle.title);
 }
 
 function getEffectiveTheme() {
@@ -111,12 +132,9 @@ function initTheme() {
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
         applyTheme(saved);
-        if (themeSelect) themeSelect.value = saved;
     } else {
         // No saved preference: follow system
         applyTheme(); // removes override
-        const effective = prefersDarkQuery.matches ? 'dark' : 'light';
-        if (themeSelect) themeSelect.value = effective;
     }
 }
 
@@ -135,7 +153,7 @@ function applyToastUITheme() {
     if (isEditMode && editor) {
         const md = editor.getMarkdown();
         const editorContainer = document.getElementById('editor-edit');
-        const height = editorContainer ? editorContainer.style.height || 'calc(100vh - 250px)' : 'calc(100vh - 250px)';
+        const height = editorContainer ? editorContainer.style.height || '100%' : '100%';
         editor.destroy();
         const _csp = resolveCodeSyntaxPlugin();
         editor = new toastui.Editor({
@@ -169,9 +187,9 @@ function applyToastUITheme() {
     }
 }
 
-if (themeSelect) {
-    themeSelect.addEventListener('change', (e) => {
-        const mode = e.target.value;
+if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+        const mode = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
         localStorage.setItem('theme', mode);
         applyTheme(mode);
         applyToastUITheme();
@@ -183,9 +201,6 @@ prefersDarkQuery.addEventListener('change', () => {
     const saved = localStorage.getItem('theme');
     if (!saved) {
         applyTheme();
-        // Also update the select to reflect the new effective theme
-        const effective = prefersDarkQuery.matches ? 'dark' : 'light';
-        if (themeSelect) themeSelect.value = effective;
         applyToastUITheme();
     }
 });
@@ -226,6 +241,8 @@ let viewer = null;
 function createViewer(initialMarkdown) {
     const mode = getEffectiveTheme();
     const el = document.querySelector('#editor');
+    // Toast UI leaves its theme classes behind on destroy; clear them so a theme switch takes effect
+    el.classList.remove('toastui-editor-dark', 'toastui-editor-default');
     const _csp = resolveCodeSyntaxPlugin();
     viewer = new toastui.Editor.factory({
         el,
@@ -319,19 +336,20 @@ function showModal(title, message, showInput = false, defaultValue = '') {
 function showToast(message, type = 'info') {
     const toastContainer = document.getElementById('toast-container');
 
+    if (type === 'danger') type = 'error';
     const icons = {
-        success: '✅',
-        error: '❌',
-        info: 'ℹ️',
-        warning: '⚠️'
+        success: 'check_circle',
+        error: 'error',
+        info: 'info',
+        warning: 'warning'
     };
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `
-        <span class="toast-icon">${icons[type]}</span>
+        <span class="toast-icon material-symbols-rounded">${icons[type] || icons.info}</span>
         <span class="toast-message">${message}</span>
-        <button class="toast-close">&times;</button>
+        <button class="icon-button toast-close" aria-label="Close"><span class="material-symbols-rounded">close</span></button>
     `;
 
     toastContainer.appendChild(toast);
@@ -525,7 +543,7 @@ btnEdit.addEventListener('click', function() {
         el: editorContainer,
         initialEditType: 'markdown',
         previewStyle: 'vertical',
-        height: 'calc(100vh - 250px)',
+        height: '100%',
         initialValue: currentContent,
         theme: getEffectiveTheme() === 'dark' ? 'dark' : 'default',
         plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
@@ -855,9 +873,9 @@ function loadMenu() {
         .then(res => res.json())
         .then(async data => {
             window.__lastStructure = data;
-            // build tags index in background if empty
+            // build tags index if empty, before rendering so the tag filter bar lists the tags
             if (Object.keys(tagsIndex).length === 0 && !tagsIndexBuilding) {
-                buildTagsIndexFromStructure(data).catch(() => {});
+                await buildTagsIndexFromStructure(data).catch(() => {});
             }
             menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(data)}</div>` + renderTagFilterBar();
             attachTagFilterEvents();
@@ -951,16 +969,16 @@ function renderTree(nodes, depth = 0) {
         const hasChildren = !!(node.children && node.children.length);
         const isSelected = isFolder ? (node.path === selectedFolderPath) : (!selectedFolderPath && node.path === currentPath);
         const liClasses = [isFolder ? 'folder' : 'file', expanded && isFolder ? 'expanded' : 'collapsed'].filter(Boolean).join(' ');
-        const caret = isFolder ? `<span class="caret" data-toggle="${node.path}" aria-label="Toggle" role="button">${expanded ? '▼' : '▶'}</span>` : '';
-        const icon = isFolder ? '/assets/folder-outline.svg' : '/assets/file-outline.svg';
+        const caret = isFolder ? `<span class="caret" data-toggle="${node.path}" aria-label="Toggle" role="button"><span class="material-symbols-rounded">${expanded ? 'expand_more' : 'chevron_right'}</span></span>` : '';
+        const icon = `<span class="material-symbols-rounded icon">${isFolder ? (expanded ? 'folder_open' : 'folder') : 'description'}</span>`;
         const item = isFolder ?
             `<div class="menu-item folder-item ${isSelected ? 'selected' : ''}" data-folder-path="${node.path}">
                 ${caret}
-                <span class="folder-name"><img src="${icon}" class="icon" /> ${node.name}</span>
+                <span class="folder-name">${icon}<span class="node-name">${node.name}</span></span>
             </div>` :
             `<div class="menu-item ${isSelected ? 'selected' : ''}">
                 ${caret}
-                <a href="#" class="file-link"><img src="${icon}" class="icon" /> ${node.name}</a>
+                <a href="#" class="file-link">${icon}<span class="node-name">${node.name}</span></a>
             </div>`;
         const children = isFolder && hasChildren ? renderTree(node.children, depth + 1) : (isFolder ? '<ul class="tree-level empty" data-depth="' + (depth + 1) + '"></ul>' : '');
         return `
@@ -1514,7 +1532,40 @@ loadMenu();
 
     let originalSettings = null;
 
+    // Tabs: Settings, Password, MCP Server. Save/Cancel only apply to the Settings tab.
+    const settingsTabs = settingsOverlay ? Array.from(settingsOverlay.querySelectorAll('.settings-tab')) : [];
+
+    function selectSettingsTab(name, focus = false) {
+        settingsTabs.forEach(tab => {
+            const selected = tab.dataset.tab === name;
+            tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+            tab.tabIndex = selected ? 0 : -1;
+            const panel = document.getElementById(tab.getAttribute('aria-controls'));
+            if (panel) panel.hidden = !selected;
+            if (selected && focus) tab.focus();
+        });
+        const isGeneral = name === 'general';
+        if (settingsSaveBtn) settingsSaveBtn.hidden = !isGeneral;
+        if (settingsCancelBtn) settingsCancelBtn.textContent = isGeneral ? 'Cancel' : 'Close';
+    }
+
+    settingsTabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => selectSettingsTab(tab.dataset.tab));
+        tab.addEventListener('keydown', (e) => {
+            let next = null;
+            if (e.key === 'ArrowRight') next = settingsTabs[(index + 1) % settingsTabs.length];
+            else if (e.key === 'ArrowLeft') next = settingsTabs[(index - 1 + settingsTabs.length) % settingsTabs.length];
+            else if (e.key === 'Home') next = settingsTabs[0];
+            else if (e.key === 'End') next = settingsTabs[settingsTabs.length - 1];
+            if (next) {
+                e.preventDefault();
+                selectSettingsTab(next.dataset.tab, true);
+            }
+        });
+    });
+
     function openSettings() {
+        selectSettingsTab('general');
         settingsOverlay && settingsOverlay.classList.add('active');
     }
     function closeSettings() {
@@ -1574,4 +1625,124 @@ loadMenu();
         if (e.target === settingsOverlay) closeSettings();
     });
     if (settingsSaveBtn) settingsSaveBtn.addEventListener('click', saveSettings);
+
+    // Change password
+    const passwordBtn = document.getElementById('settings-password-btn');
+    const inputCurrentPassword = document.getElementById('settings-current-password');
+    const inputNewPassword = document.getElementById('settings-new-password');
+    const inputConfirmPassword = document.getElementById('settings-confirm-password');
+
+    async function changePassword() {
+        const currentPassword = inputCurrentPassword.value;
+        const newPassword = inputNewPassword.value;
+        if (!currentPassword || !newPassword) {
+            showToast && showToast('Enter your current and new password', 'warning');
+            return;
+        }
+        if (newPassword !== inputConfirmPassword.value) {
+            showToast && showToast('New passwords do not match', 'warning');
+            return;
+        }
+        try {
+            const res = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+            if (!res.ok) {
+                let message = 'Failed to change password';
+                if (res.status === 429) message = 'Too many attempts. Wait a minute and try again.';
+                else { try { message = (await res.json()).error || message; } catch { } }
+                showToast && showToast(message, 'error');
+                return;
+            }
+            inputCurrentPassword.value = inputNewPassword.value = inputConfirmPassword.value = '';
+            showToast && showToast('Password changed', 'success');
+        } catch (err) {
+            showToast && showToast('Failed to change password', 'error');
+        }
+    }
+    if (passwordBtn) passwordBtn.addEventListener('click', changePassword);
+
+    // MCP API key
+    const mcpUrlInput = document.getElementById('settings-mcp-url');
+    const mcpStatus = document.getElementById('settings-mcp-status');
+    const mcpKeyRow = document.getElementById('settings-mcp-key-row');
+    const mcpKeyInput = document.getElementById('settings-mcp-key');
+    const mcpCopyBtn = document.getElementById('settings-mcp-copy-btn');
+    const mcpGenerateBtn = document.getElementById('settings-mcp-generate-btn');
+    const mcpRevokeBtn = document.getElementById('settings-mcp-revoke-btn');
+
+    function renderMcpStatus(exists) {
+        if (mcpStatus) mcpStatus.textContent = exists
+            ? 'An API key is active. Generating a new key replaces it.'
+            : 'No API key yet. MCP access is disabled until you generate one.';
+        if (mcpGenerateBtn) mcpGenerateBtn.textContent = exists ? 'Generate new API key' : 'Generate API key';
+        if (mcpRevokeBtn) mcpRevokeBtn.hidden = !exists;
+    }
+
+    async function loadMcpStatus() {
+        if (mcpUrlInput) mcpUrlInput.value = `${location.origin}/mcp`;
+        if (mcpKeyRow) mcpKeyRow.hidden = true;
+        if (mcpKeyInput) mcpKeyInput.value = '';
+        try {
+            const res = await fetch('/api/auth/api-key');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            renderMcpStatus((await res.json()).exists);
+        } catch {
+            if (mcpStatus) mcpStatus.textContent = 'Could not load API key status.';
+        }
+    }
+
+    async function generateMcpKey() {
+        try {
+            const res = await fetch('/api/auth/api-key', { method: 'POST' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (mcpKeyInput) mcpKeyInput.value = data.apiKey;
+            if (mcpKeyRow) mcpKeyRow.hidden = false;
+            renderMcpStatus(true);
+            mcpKeyInput && mcpKeyInput.select();
+        } catch {
+            showToast && showToast('Failed to generate API key', 'error');
+        }
+    }
+
+    async function revokeMcpKey() {
+        try {
+            const res = await fetch('/api/auth/api-key', { method: 'DELETE' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (mcpKeyRow) mcpKeyRow.hidden = true;
+            if (mcpKeyInput) mcpKeyInput.value = '';
+            renderMcpStatus(false);
+            showToast && showToast('API key revoked', 'success');
+        } catch {
+            showToast && showToast('Failed to revoke API key', 'error');
+        }
+    }
+
+    async function copyMcpKey() {
+        try {
+            await navigator.clipboard.writeText(mcpKeyInput.value);
+            showToast && showToast('API key copied', 'success');
+        } catch {
+            mcpKeyInput.select();
+            showToast && showToast('Press Ctrl+C / Cmd+C to copy the key', 'info');
+        }
+    }
+
+    if (mcpGenerateBtn) mcpGenerateBtn.addEventListener('click', generateMcpKey);
+    if (mcpRevokeBtn) mcpRevokeBtn.addEventListener('click', revokeMcpKey);
+    if (mcpCopyBtn) mcpCopyBtn.addEventListener('click', copyMcpKey);
+    if (settingsBtn) settingsBtn.addEventListener('click', loadMcpStatus);
+})();
+
+// Sign out
+(function(){
+    const logoutBtn = document.getElementById('logout-btn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', async () => {
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { }
+        location.href = '/login.html';
+    });
 })();

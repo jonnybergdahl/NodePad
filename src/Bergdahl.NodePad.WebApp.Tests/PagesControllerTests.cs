@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Bergdahl.NodePad.WebApp;
+using Bergdahl.NodePad.WebApp.Models;
+using Bergdahl.NodePad.WebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,8 +22,9 @@ namespace Bergdahl.NodePad.WebApp.Tests
             var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
             using var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
             var logger = loggerFactory.CreateLogger<PagesController>();
+            var notes = new NotesService(config, loggerFactory.CreateLogger<NotesService>());
 
-            return (new PagesController(config, logger), tempRoot, logger);
+            return (new PagesController(notes, logger), tempRoot, logger);
         }
 
         [Fact]
@@ -111,23 +114,14 @@ namespace Bergdahl.NodePad.WebApp.Tests
             try
             {
                 var validName = Assert.IsType<OkObjectResult>(controller.ValidateName(path: string.Empty, type: "file", name: "note"));
-                                var validObj = validName.Value!;
-                                var validProp1 = validObj.GetType().GetProperty("valid");
-                                Assert.NotNull(validProp1);
-                                var isValid1 = (bool)(validProp1!.GetValue(validObj) ?? false);
-                                Assert.True(isValid1);
-                var bad = controller.ValidateName(path: null, type: "file", name: "inv*alid");
-                var badOk = Assert.IsType<OkObjectResult>(bad);
-                var badObj = badOk.Value!;
-                var validProp = badObj.GetType().GetProperty("valid");
-                Assert.NotNull(validProp);
-                var isValid = (bool)(validProp!.GetValue(badObj) ?? false);
-                Assert.True(isValid);
-                var suggestedNameProp = badObj.GetType().GetProperty("suggestedName");
-                Assert.NotNull(suggestedNameProp);
-                var suggested = Assert.IsType<string>(suggestedNameProp!.GetValue(badObj));
-                Assert.NotEqual("inv*alid", suggested);
-                Assert.NotEmpty(suggested);
+                Assert.True(Assert.IsType<NameValidation>(validName.Value).Valid);
+
+                var bad = Assert.IsType<OkObjectResult>(controller.ValidateName(path: null, type: "file", name: "inv*alid"));
+                var badResult = Assert.IsType<NameValidation>(bad.Value);
+                Assert.True(badResult.Valid);
+                Assert.NotNull(badResult.SuggestedName);
+                Assert.NotEqual("inv*alid", badResult.SuggestedName);
+                Assert.NotEmpty(badResult.SuggestedName!);
             }
             finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
         }

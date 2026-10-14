@@ -1,4 +1,61 @@
-# API endpoints (tags, structure, and meta)
+# NodePad API
+
+The web interface talks to NodePad through this REST API. Paths of notes and folders are relative to the Pages folder and use forward slashes; notes end in .md.
+
+Errors are returned as 400 Bad Request (invalid input), 404 Not Found, 409 Conflict, 403 (access denied on disk) or 500, with a short message in the body.
+
+## Authentication
+
+All endpoints require a signed-in session (cookie "NodePad.Auth"), except the ones under /api/auth marked as anonymous below. Requests without a valid session get 401 Unauthorized.
+
+- GET /api/auth/status (anonymous)
+  - Returns { configured: bool, authenticated: bool, username: string|null }. configured is false until the first account has been created.
+
+- POST /api/auth/setup (anonymous, only while no account exists)
+  - Body: { username, password }. Password must be at least 6 characters.
+  - Creates the account in nodepad.auth.json and signs in. Returns 409 if an account already exists.
+
+- POST /api/auth/login (anonymous)
+  - Body: { username, password, rememberMe }. rememberMe=true keeps the session across browser restarts (30 days, sliding).
+  - Returns 200 and sets the session cookie, 400 on wrong credentials, 409 if no account exists yet.
+
+- POST /api/auth/logout (anonymous)
+  - Clears the session cookie.
+
+- POST /api/auth/change-password
+  - Body: { currentPassword, newPassword }. Returns 400 if the current password is wrong.
+  - Sessions in other browsers are invalidated.
+
+- GET /api/auth/api-key
+  - Returns { exists: bool }: whether an API key for the MCP endpoint has been generated.
+
+- POST /api/auth/api-key
+  - Generates a new API key for the MCP endpoint, replacing any existing one. Returns { apiKey }. The key is only returned here; only its hash is stored.
+
+- DELETE /api/auth/api-key
+  - Revokes the API key, which disables the MCP endpoint.
+
+login, setup and change-password are rate limited to 5 requests per minute per client address (429 Too Many Requests).
+
+## MCP endpoint
+
+- /mcp (MCP Streamable HTTP)
+  - Requires the API key, sent as "Authorization: Bearer <key>" or "X-Api-Key: <key>". Returns 401 without a valid key, and always while no key exists. The browser session cookie is not accepted here, and the API key is not accepted on /api.
+  - Tools (paths are relative to the Pages folder and use forward slashes; notes end in .md):
+    - search_notes(query, tags?, limit?): same as GET /api/pages/search
+    - list_notes(tags?): the sorted folder tree with note titles
+    - read_note(path): { path, title, tags, lastModifiedUtc, content }
+    - recent_notes(limit?, tags?): same as GET /api/pages/recent
+    - list_tags(): same as GET /api/pages/tags
+    - create_note(path, content, tags?): creates a note; fails if it already exists
+    - update_note(path, content, tags?): replaces the content of an existing note; tags are kept when omitted
+    - set_note_tags(path, tags): replaces a note's tags
+    - create_folder(path)
+    - move(source, destination): same as POST /api/pages/move
+    - rename(path, newName): same as POST /api/pages/rename
+  - There is no delete tool.
+
+## Pages
 
 The frontend uses server-side endpoints for tags and filtered/sorted structure to reduce client work and avoid N+1 requests.
 
@@ -62,6 +119,17 @@ The frontend uses server-side endpoints for tags and filtered/sorted structure t
   - Two content types are supported at the same route:
     - text/plain (legacy): body is raw markdown; optional query "tags=a,b". Tags are normalized server-side before storing.
     - application/json (structured): body { content: string, tags?: string[] }. Tags are normalized server-side before storing.
+  - Tags are left unchanged when none are given. The note and its folders are created if they do not exist.
+  - Returns the saved content as text/plain. Every save starts a zip backup of the Pages folder in the background.
+
+- POST /api/pages/create?path=...&type=file|directory
+  - Creates a note (type=file) or a folder (type=directory).
+  - A new note starts with a "# " heading taken from the file name, and gets an empty .meta file.
+  - Returns 400 if it already exists.
+
+- DELETE /api/pages/delete?path=...&recursive=true|false
+  - Deletes a note (with its .meta file) or a folder.
+  - A folder that is not empty is only deleted with recursive=true; otherwise 409 Conflict is returned.
 
 - GET /api/pages/search?query=...&tags=a,b&limit=100
   - Enhanced search with relevance scoring, optional tag filter, and highlight ranges for snippets.
@@ -105,6 +173,33 @@ The frontend uses server-side endpoints for tags and filtered/sorted structure t
     - Move to another folder: POST /api/pages/move?source=docs/intro.md&destination=archive
     - Move to root: POST /api/pages/move?source=archive/intro.md&destination=
 
-Notes
-- Tag normalization is case-insensitive with whitespace trimmed and collapsed. Normalized tags are written when saving; existing files are unaffected until re-saved.
-- These endpoints are opt-in. Calling /api/pages/structure without parameters preserves existing behavior.
+- POST /api/pages/rename?path=...&newName=...
+  - Renames a note or a folder in place. For notes, .md is added to newName if missing, and the .meta file is renamed too.
+  - Returns JSON: { oldPath: string, path: string, type: "file"|"directory" }. Returns 400 if the new name is taken.
+
+## Images
+
+- POST /api/uploads/images?pagePath=...
+  - Multipart form upload with the file in the "image" field. PNG, JPEG, GIF, WebP and SVG are accepted.
+  - With pagePath (a note path), the image is saved in the same folder as the note; otherwise in wwwroot/uploads/images.
+  - An existing image with the same name is replaced.
+  - Maximum size is set by "Uploads:MaxBytes" in the configuration (default 10 MB); larger files get 413.
+  - Returns { url }, for example { "url": "/pages/Folder/diagram.png" }.
+
+- GET /pages/...
+  - Serves files from the Pages folder, such as images referenced by notes.
+
+## Settings
+
+- GET /api/settings
+  - Returns { allowedHosts, pagesDirectory, backupDirectory } from nodepad.json.
+
+- POST /api/settings
+  - Body: { allowedHosts?, pagesDirectory?, backupDirectory? }. Only the given values are changed in nodepad.json, and missing directories are created.
+  - Returns the updated settings. A changed Pages directory takes effect after a restart.
+
+## Notes
+
+- Tags are normalized to lowercase, with whitespace trimmed and collapsed. Normalized tags are written when saving; existing files are unaffected until re-saved.
+- Tags are stored as a comma-separated list in a .meta file next to the note (ideas.md → ideas.meta).
+- The query options of /api/pages/structure are opt-in. Calling it without parameters returns the unsorted tree.
