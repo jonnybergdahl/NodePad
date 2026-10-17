@@ -978,7 +978,7 @@ function renderTree(nodes, depth = 0) {
             </div>` :
             `<div class="menu-item ${isSelected ? 'selected' : ''}">
                 ${caret}
-                <a href="#" class="file-link">${icon}<span class="node-name">${node.name}</span></a>
+                <a href="#" class="file-link">${icon}<span class="node-name">${node.name.replace(/\.md$/i, '')}</span></a>
             </div>`;
         const children = isFolder && hasChildren ? renderTree(node.children, depth + 1) : (isFolder ? '<ul class="tree-level empty" data-depth="' + (depth + 1) + '"></ul>' : '');
         return `
