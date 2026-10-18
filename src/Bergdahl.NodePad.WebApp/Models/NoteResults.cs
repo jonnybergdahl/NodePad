@@ -22,3 +22,11 @@ public record NameValidation(
     bool Valid,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Message = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SuggestedName = null);
+
+public record TodoItem(
+    int Index,
+    string Text,
+    bool Done,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateOnly? DoneDate = null);
+
+public record TodoList(string Name, IReadOnlyList<TodoItem> Items, int HiddenDoneCount);

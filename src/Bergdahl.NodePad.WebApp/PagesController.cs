@@ -5,15 +5,13 @@ namespace Bergdahl.NodePad.WebApp;
 
 [ApiController]
 [Route("api/pages")]
-public class PagesController: ControllerBase
+public class PagesController: NotesApiController
 {
     private readonly NotesService _notes;
-    private readonly ILogger<PagesController> _logger;
 
-    public PagesController(NotesService notes, ILogger<PagesController> logger)
+    public PagesController(NotesService notes, ILogger<PagesController> logger) : base(logger)
     {
         _notes = notes;
-        _logger = logger;
     }
 
     [HttpGet("structure")]
@@ -174,35 +172,5 @@ public class PagesController: ControllerBase
     public IActionResult GetPageInfo([FromQuery] string path)
     {
         return Execute("reading info", path, () => Ok(_notes.GetInfo(path)));
-    }
-
-    /// <summary>
-    /// Runs a notes operation and maps failures to HTTP responses.
-    /// </summary>
-    private IActionResult Execute(string activity, string? target, Func<IActionResult> action)
-    {
-        try
-        {
-            return action();
-        }
-        catch (NotesException ex)
-        {
-            return ex.Kind switch
-            {
-                NotesErrorKind.NotFound => ex.UserMessage == null ? NotFound() : NotFound(ex.UserMessage),
-                NotesErrorKind.Conflict => Conflict(ex.UserMessage),
-                _ => BadRequest(ex.UserMessage),
-            };
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            _logger.LogError(ex, "Access denied when {Activity}: {Target}", activity, target);
-            return StatusCode(403, "Access denied");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error {Activity}: {Target}", activity, target);
-            return StatusCode(500, "Internal server error");
-        }
     }
 }

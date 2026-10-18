@@ -967,7 +967,8 @@ function renderTree(nodes, depth = 0) {
         const isFolder = node.type !== 'file';
         const expanded = isFolder ? isExpanded(node.path, depth) : false;
         const hasChildren = !!(node.children && node.children.length);
-        const isSelected = isFolder ? (node.path === selectedFolderPath) : (!selectedFolderPath && node.path === currentPath);
+        // While the ToDo page is open nothing in the tree is shown as selected
+        const isSelected = !todoViewActive && (isFolder ? (node.path === selectedFolderPath) : (!selectedFolderPath && node.path === currentPath));
         const liClasses = [isFolder ? 'folder' : 'file', expanded && isFolder ? 'expanded' : 'collapsed'].filter(Boolean).join(' ');
         const caret = isFolder ? `<span class="caret" data-toggle="${node.path}" aria-label="Toggle" role="button"><span class="material-symbols-rounded">${expanded ? 'expand_more' : 'chevron_right'}</span></span>` : '';
         const icon = `<span class="material-symbols-rounded icon">${isFolder ? (expanded ? 'folder_open' : 'folder') : 'description'}</span>`;
@@ -1178,6 +1179,7 @@ menu.addEventListener('click', function(e) {
 
     if (e.target.classList.contains('folder-item') || e.target.closest('.folder-item')) {
         const folderItem = e.target.classList.contains('folder-item') ? e.target : e.target.closest('.folder-item');
+        hideTodoView();
         currentFolderPath = folderItem.dataset.folderPath;
         selectedFolderPath = currentFolderPath;
         // Re-render to show selected state on the clicked folder
@@ -1273,6 +1275,7 @@ async function loadFile(path) {
         cancelEdit();
     }
 
+    hideTodoView();
     currentPath = path;
     viewer.setMarkdown('Loading...');
 
@@ -1532,7 +1535,7 @@ loadMenu();
 
     let originalSettings = null;
 
-    // Tabs: Settings, Password, MCP Server. Save/Cancel only apply to the Settings tab.
+    // Tabs: Settings, Password, MCP Server, To do lists. Save/Cancel only apply to the Settings tab.
     const settingsTabs = settingsOverlay ? Array.from(settingsOverlay.querySelectorAll('.settings-tab')) : [];
 
     function selectSettingsTab(name, focus = false) {
@@ -1547,6 +1550,7 @@ loadMenu();
         const isGeneral = name === 'general';
         if (settingsSaveBtn) settingsSaveBtn.hidden = !isGeneral;
         if (settingsCancelBtn) settingsCancelBtn.textContent = isGeneral ? 'Cancel' : 'Close';
+        if (name === 'todo') loadSettingsTodoLists();
     }
 
     settingsTabs.forEach((tab, index) => {

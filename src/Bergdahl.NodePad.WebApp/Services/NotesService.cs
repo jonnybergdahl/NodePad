@@ -15,6 +15,9 @@ public class NotesService
     private readonly string backupRootPath;
     private readonly ILogger<NotesService> _logger;
 
+    /// <summary>Full path of the pages folder.</summary>
+    public string RootPath => rootPath;
+
     public NotesService(IConfiguration configuration, ILogger<NotesService> logger)
     {
         _logger = logger;
@@ -140,7 +143,7 @@ public class NotesService
         var requiredTags = ParseTags(tags);
 
         var results = new List<SearchHit>();
-        var files = Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories);
+        var files = EnumerateNoteFiles();
         foreach (var file in files)
         {
             string rel = Path.GetRelativePath(rootPath, file).Replace("\\", "/");
@@ -291,7 +294,7 @@ public class NotesService
         if (limit > 100) limit = 100;
 
         var required = ParseTags(tags);
-        var files = Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories)
+        var files = EnumerateNoteFiles()
             .Select(path => new FileInfo(path))
             .OrderByDescending(fi => fi.LastWriteTimeUtc)
             .ToList();
@@ -333,7 +336,7 @@ public class NotesService
     public List<NoteSummary> GetUntagged()
     {
         var items = new List<NoteSummary>();
-        foreach (var file in Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories))
+        foreach (var file in EnumerateNoteFiles())
         {
             string[] displayTags;
             try { displayTags = ReadTagsFromMeta(file); } catch { continue; }
@@ -454,6 +457,10 @@ public class NotesService
         if (!targetFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
         {
             return new NameValidation(false, "Invalid target path");
+        }
+        if (IsInTodoFolder(targetFull))
+        {
+            return new NameValidation(false, $"The {TodoService.FolderName} folder is reserved for to do lists");
         }
         if (type == "file")
         {
@@ -704,6 +711,7 @@ public class NotesService
         var parent = Path.GetDirectoryName(oldDirFull) ?? rootFull;
         var newDirFull = Path.GetFullPath(Path.Combine(parent, newName));
         if (!newDirFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)) throw NotesException.BadRequest("Invalid new name");
+        RejectTodoFolder(newDirFull);
         if (Directory.Exists(newDirFull)) throw NotesException.BadRequest("A folder with the new name already exists");
 
         Directory.Move(oldDirFull, newDirFull);
@@ -804,7 +812,39 @@ public class NotesService
             return null;
         }
 
+        RejectTodoFolder(fullPath);
         return fullPath;
+    }
+
+    /// <summary>
+    /// True for the _ToDo folder at the pages root and anything inside it.
+    /// </summary>
+    private bool IsInTodoFolder(string fullPath)
+    {
+        var todoFull = Path.Combine(Path.GetFullPath(rootPath), TodoService.FolderName);
+        var full = Path.GetFullPath(fullPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return full.Equals(todoFull, StringComparison.OrdinalIgnoreCase)
+               || full.StartsWith(todoFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Note operations must not create, change or remove anything in the _ToDo folder.
+    /// </summary>
+    private void RejectTodoFolder(string fullPath)
+    {
+        if (IsInTodoFolder(fullPath))
+            throw NotesException.BadRequest($"The {TodoService.FolderName} folder is reserved for to do lists");
+    }
+
+    /// <summary>
+    /// All notes in the tree, leaving out ToDo lists and dot-prefixed hidden folders (like the tree does).
+    /// </summary>
+    private IEnumerable<string> EnumerateNoteFiles()
+    {
+        return Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories)
+            .Where(file => !IsInTodoFolder(file)
+                           && !RelPath(file).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                               .SkipLast(1).Any(segment => segment.StartsWith(".")));
     }
 
     private static string LastSegment(string name)
@@ -879,7 +919,7 @@ public class NotesService
     private Dictionary<string, List<string>> BuildNormalizedTagsIndex()
     {
         var dict = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories))
+        foreach (var file in EnumerateNoteFiles())
         {
             var tags = ReadTagsFromMeta(file).Select(NormalizeTag).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
             dict[RelPath(file)] = tags;
@@ -934,6 +974,7 @@ public class NotesService
                 var name = Path.GetFileName(entry);
                 if (string.IsNullOrEmpty(name)) return false;
                 if (name.StartsWith(".")) return false; // ignore dot-prefixed hidden folders
+                if (IsInTodoFolder(entry)) return false; // ToDo lists have their own page
                 try
                 {
                     var attrs = File.GetAttributes(entry);
@@ -1164,6 +1205,11 @@ public class NotesService
     // ---------------------------------------------------------------------
     // Backup
     // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Starts a background zip backup of the pages folder, as after saving a note.
+    /// </summary>
+    internal void RequestBackup() => StartBackgroundBackup();
 
     private void StartBackgroundBackup()
     {

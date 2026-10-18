@@ -68,7 +68,13 @@
     <div id="search-results" class="search-results" aria-live="polite" aria-label="Search results" hidden></div>
 </header>
 <div id="container">
-    <div id="menu"></div>
+    <nav id="sidebar" aria-label="Navigation">
+        <a href="#" id="todo-nav" class="todo-nav" title="To do lists">
+            <span class="material-symbols-rounded">checklist</span>
+            <span>To do</span>
+        </a>
+        <div id="menu"></div>
+    </nav>
     <div id="editor-section">
         <div class="toolbar">
             <button id="btn-create-file" class="button tonal" title="Create new document"><span class="material-symbols-rounded">note_add</span>New Document</button>
@@ -87,6 +93,7 @@
             </div>
         </div>
         <div id="editor"></div>
+        <div id="todo-view" class="todo-view" aria-label="To do lists" hidden></div>
     </div>
 </div>
 
@@ -101,6 +108,7 @@
             <button class="settings-tab" role="tab" id="settings-tab-general" aria-controls="settings-panel-general" aria-selected="true" data-tab="general">Settings</button>
             <button class="settings-tab" role="tab" id="settings-tab-password" aria-controls="settings-panel-password" aria-selected="false" tabindex="-1" data-tab="password">Password</button>
             <button class="settings-tab" role="tab" id="settings-tab-mcp" aria-controls="settings-panel-mcp" aria-selected="false" tabindex="-1" data-tab="mcp">MCP Server</button>
+            <button class="settings-tab" role="tab" id="settings-tab-todo" aria-controls="settings-panel-todo" aria-selected="false" tabindex="-1" data-tab="todo">To do lists</button>
         </div>
         <div class="modal-body">
             <div class="settings-panel" role="tabpanel" id="settings-panel-general" aria-labelledby="settings-tab-general">
@@ -151,6 +159,14 @@
                     <button id="settings-mcp-revoke-btn" class="modal-btn modal-btn-secondary">Revoke key</button>
                 </div>
             </div>
+            <div class="settings-panel" role="tabpanel" id="settings-panel-todo" aria-labelledby="settings-tab-todo" hidden>
+                <p class="hint">Create, rename and delete to do lists. Items are added and checked off on the To do page.</p>
+                <ul id="settings-todo-lists" class="settings-todo-lists" aria-label="To do lists"></ul>
+                <div class="settings-todo-add">
+                    <input type="text" id="settings-todo-name" class="modal-input" placeholder="Name of the new list" aria-label="Name of the new list">
+                    <button id="settings-todo-add-btn" class="modal-btn modal-btn-primary">Add list</button>
+                </div>
+            </div>
         </div>
         <div class="modal-footer">
             <button id="settings-cancel-btn" class="modal-btn modal-btn-secondary">Cancel</button>
@@ -189,6 +205,7 @@
     </a></span>
 </footer>
 
+<script src="js/todo.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

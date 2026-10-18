@@ -23,6 +23,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - Search notes by title or content
 - Switch between a light and a dark theme
 - Enjoy automatic, lightweight backups of your notes folder
+- Keep named to do lists: checked items get the date they were done and disappear two weeks later
 - Let AI assistants such as Claude read and edit your notes through the built-in MCP server
 
 ## Quick start
@@ -34,7 +35,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - Open the shown address in your browser (for example http://localhost:5132)
 
 2) Explore the sample content
-- When run from the source code, NodePad uses the Pages folder in the project, which contains this documentation and a Markdown showcase as example notes.
+- When run from the source code, NodePad uses the Pages folder in the project, which contains this documentation, a Markdown showcase and a sample to do list.
 - A published build starts with an empty Pages folder.
 
 3) Create your first note
@@ -59,7 +60,7 @@ Hosting in IIS
 
 ## Using NodePad from Claude and other AI assistants (MCP)
 
-NodePad has a built-in MCP server, so AI assistants such as Claude Code can search, read, create and edit your notes. Notes cannot be deleted through it.
+NodePad has a built-in MCP server, so AI assistants such as Claude Code can search, read, create and edit your notes, and read and update your to do lists. Notes and to do lists cannot be deleted through it.
 
 1) In NodePad, open Settings (the gear button), go to the "MCP Server" tab and click "Generate API key". Copy the key right away — it is only shown once. Generating a new key replaces the old one, and "Revoke key" turns MCP access off.
 2) Add the server to your assistant using the MCP server URL shown in Settings (for example `http://<your-nodepad-host>/mcp`) and send the key as a bearer token. For Claude Code:
@@ -72,7 +73,7 @@ NodePad has a built-in MCP server, so AI assistants such as Claude Code can sear
 
    Other clients that support Streamable HTTP work the same way; the key can also be sent as an "X-Api-Key" header.
 
-Tools: search_notes, list_notes, read_note, recent_notes, list_tags, create_note, update_note, set_note_tags, create_folder, move and rename. Every save also triggers the normal zip backup.
+Tools for notes: search_notes, list_notes, read_note, recent_notes, list_tags, create_note, update_note, set_note_tags, create_folder, move and rename. Tools for to do lists: list_todos, create_todo_list, add_todo and set_todo_done. Every save also triggers the normal zip backup.
 
 The API key only grants access to /mcp, not to the rest of the app. Only a hash of the key is stored (in nodepad.auth.json).
 
@@ -104,6 +105,27 @@ The API key only grants access to /mcp, not to the rest of the app. Only a hash 
 - Backups
   - Every time you save a note, NodePad zips the whole Pages folder into the Backups folder in the background. The 10 most recent backups are kept.
 
+## To do lists
+
+Click "To do" at the top of the menu to open the To do page. It shows all your to do lists side by side.
+
+- Lists are created, renamed and deleted on the "To do lists" tab in Settings.
+- Type in "Add item" at the bottom of a list and press Enter to add an item.
+- Tick an item's checkbox when it is done. NodePad notes the date, and done items are moved below the open ones, newest first.
+- Click an item's text to change it (Enter saves, Esc cancels), and use the cross that appears when you point at an item to delete it.
+- Done items older than two weeks are hidden, but stay in the list. Tick "Show older done items" to see them again.
+
+Each list is a Markdown file in the _ToDo folder in Pages, for example _ToDo/Groceries.md:
+
+```markdown
+# Groceries
+
+- [ ] Milk
+- [x] Eggs ✅ 2026-10-18
+```
+
+You can edit these files in any editor: lines that are not items are left untouched, and done items without a date are always shown. The _ToDo folder is reserved for to do lists, so it is not shown in the note tree, search or tags, and notes cannot be created in it.
+
 ## Settings
 
 Open Settings with the gear button in the top bar.
@@ -111,6 +133,7 @@ Open Settings with the gear button in the top bar.
 - Settings tab: Allowed Hosts, the Pages directory and the Backup directory. These are saved to nodepad.json, which is created the first time you save if it does not exist yet; until then the defaults are used (Pages and Backups next to the app). Leave a field empty to go back to its default. Relative paths are relative to the folder NodePad runs from. A changed Pages directory takes effect after restarting NodePad.
 - Password tab: change your password.
 - MCP Server tab: create or revoke the API key for AI assistants (MCP).
+- To do lists tab: create, rename and delete to do lists. Deleting a list also deletes its items.
 
 Some options can only be set by editing nodepad.json (or appsettings.json):
 
@@ -122,6 +145,7 @@ Some options can only be set by editing nodepad.json (or appsettings.json):
 
 - Your notes are plain .md files stored in the Pages folder used by NodePad.
 - A note's tags are stored in a .meta file with the same name next to it (for example ideas.md and ideas.meta).
+- To do lists are stored in the _ToDo folder in Pages, one Markdown file per list.
 - Each note can have images saved in the same folder as the note.
 - This makes it easy to back up, sync, or move your notes to another computer.
 

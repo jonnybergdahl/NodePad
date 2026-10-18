@@ -24,6 +24,9 @@ builder.Services.AddControllers(options =>
 
 // File system work on the notes tree, shared by the REST API and the MCP tools
 builder.Services.AddScoped<NotesService>();
+// ToDo lists in the _ToDo folder; TimeProvider supplies "today" for done dates (tests replace it)
+builder.Services.AddScoped<TodoService>();
+builder.Services.AddSingleton(TimeProvider.System);
 
 // Lägg till logging
 builder.Logging.ClearProviders();
@@ -100,7 +103,8 @@ builder.Services.AddMcpServer(options =>
         options.ServerInstructions = NotesTools.Instructions;
     })
     .WithHttpTransport()
-    .WithTools<NotesTools>();
+    .WithTools<NotesTools>()
+    .WithTools<TodoTools>();
 
 builder.Services.AddRateLimiter(options =>
 {

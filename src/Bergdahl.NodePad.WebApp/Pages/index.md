@@ -14,6 +14,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - Search notes by title or content
 - Switch between a light and a dark theme
 - Enjoy automatic, lightweight backups of your notes folder
+- Keep named to do lists: checked items get the date they were done and disappear two weeks later
 - Let AI assistants such as Claude read and edit your notes through the built-in MCP server
 
 ## Documentation
@@ -22,13 +23,14 @@ The NodePad documentation is in the **Documentation** folder in the tree on the 
 
 - Getting started
 - Everyday use
+- To do lists
 - Settings
 - Signing in
 - AI assistants (MCP)
 - Tips and FAQ
 - API
 
-The **Folder** folder holds a Markdown showcase with examples of headings, lists, tables, code blocks and more.
+The **Folder** folder holds a Markdown showcase with examples of headings, lists, tables, code blocks and more, and **To do** at the top of the menu has a sample to do list.
 
 ---
 

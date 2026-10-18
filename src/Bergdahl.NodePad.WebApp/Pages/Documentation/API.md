@@ -53,6 +53,10 @@ login, setup and change-password are rate limited to 5 requests per minute per c
     - create_folder(path)
     - move(source, destination): same as POST /api/pages/move
     - rename(path, newName): same as POST /api/pages/rename
+    - list_todos(includeOldDone?): same as GET /api/todos
+    - create_todo_list(name): same as POST /api/todos/lists
+    - add_todo(list, text): same as POST /api/todos/items
+    - set_todo_done(list, index, done?): checks (default) or unchecks an item, same as PUT /api/todos/items with { done }
   - There is no delete tool.
 
 ## Pages
@@ -176,6 +180,39 @@ The frontend uses server-side endpoints for tags and filtered/sorted structure t
 - POST /api/pages/rename?path=...&newName=...
   - Renames a note or a folder in place. For notes, .md is added to newName if missing, and the .meta file is renamed too.
   - Returns JSON: { oldPath: string, path: string, type: "file"|"directory" }. Returns 400 if the new name is taken.
+
+## ToDo lists
+
+ToDo lists are Markdown files in the _ToDo folder of Pages, one per list; the list name is the file name without .md. Items are task lines ("- [ ] text", "- [x] text ✅ 2026-10-18"). The _ToDo folder is reserved: the /api/pages endpoints leave it out and return 400 for paths inside it.
+
+A list is returned as { name, items: [{ index, text, done, doneDate? }], hiddenDoneCount }:
+- index: the item's position among the task lines in the file (0-based). Use it to change or delete the item; it changes when items are added or removed.
+- doneDate: the date the item was checked (yyyy-MM-dd), missing for open items and for done items written without a date.
+- Items are returned open first (in file order), then done items, newest first.
+- Done items older than two weeks are left out and counted in hiddenDoneCount, unless includeOldDone=true.
+
+Every change below returns the updated list (or nothing for a deleted list) and accepts includeOldDone=true. Errors: 400 for an empty or invalid name or text, 404 for an unknown list or index, 409 when the list name is taken.
+
+- GET /api/todos?includeOldDone=true|false
+  - Returns all lists, sorted by name.
+
+- POST /api/todos/lists
+  - Body: { name }. Creates an empty list. Characters that are not allowed in file names become "-".
+
+- POST /api/todos/lists/rename?name=...&newName=...
+  - Renames the list file and its "# " heading.
+
+- DELETE /api/todos/lists?name=...
+  - Deletes the list and all its items.
+
+- POST /api/todos/items?list=...
+  - Body: { text }. Adds an open item after the last item. The text must be a single line.
+
+- PUT /api/todos/items?list=...&index=...
+  - Body: { text?, done? }. Changes the text and/or done state. done=true records today's date (an item that is already done keeps its date); done=false removes the date.
+
+- DELETE /api/todos/items?list=...&index=...
+  - Deletes the item.
 
 ## Images
 

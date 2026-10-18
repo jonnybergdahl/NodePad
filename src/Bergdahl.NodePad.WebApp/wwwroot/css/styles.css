@@ -209,7 +209,7 @@ a {
 
 /* ---------- Navigation tree (left menu) ---------- */
 
-#menu {
+#sidebar {
     width: 280px;
     min-width: 280px;
     flex-shrink: 0;
@@ -219,6 +219,48 @@ a {
     background: var(--md-surface-container-low);
     border-right: 1px solid var(--md-outline-variant);
     font-size: 0.875rem;
+}
+
+#menu {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fixed ToDo entry above the notes tree */
+.todo-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    margin-bottom: 4px;
+    padding: 0 16px;
+    border-radius: var(--md-shape-full);
+    color: var(--md-on-surface-variant);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s;
+}
+
+.todo-nav .material-symbols-rounded {
+    font-size: 20px;
+}
+
+.todo-nav:hover {
+    background: var(--md-state-hover);
+    color: var(--md-on-surface);
+}
+
+.todo-nav.selected,
+.todo-nav.selected:hover {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+}
+
+.todo-nav:focus-visible {
+    outline: 2px solid var(--md-primary);
+    outline-offset: -2px;
 }
 
 .menu-tree {
@@ -317,6 +359,7 @@ a {
 #menu .root-dropzone {
     display: flex;
     align-items: center;
+    gap: 12px;
     min-height: 40px;
     margin: 0 0 8px;
     padding: 0 16px;
@@ -327,7 +370,18 @@ a {
     user-select: none;
 }
 
+/* Icon and label are drawn here because app.js re-renders the drop zone as an empty element */
 #menu .root-dropzone::before {
+    content: 'folder';
+    font-family: 'Material Symbols Rounded';
+    font-size: 20px;
+    font-weight: normal;
+    line-height: 1;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+
+#menu .root-dropzone::after {
     content: 'Pages';
 }
 
@@ -544,6 +598,241 @@ a {
 .toastui-editor-mode-switch button,
 .toastui-editor-popup button {
     font: inherit;
+}
+
+/* ---------- ToDo page ---------- */
+
+.todo-view {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 16px 32px;
+}
+
+.todo-view[hidden] {
+    display: none;
+}
+
+.todo-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+    margin-bottom: 16px;
+}
+
+.todo-title {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 400;
+}
+
+.todo-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    color: var(--md-on-surface-variant);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.todo-toggle input,
+.todo-check {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--md-primary);
+    cursor: pointer;
+}
+
+.todo-hidden-count {
+    opacity: 0.8;
+}
+
+/* Cards share one width and wrap, like LinkDash's groups */
+.todo-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.todo-card {
+    flex: 0 1 360px;
+    min-width: 0;
+    padding: 12px 20px 16px;
+    background: var(--md-surface-container-low);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-medium);
+    box-shadow: var(--md-elevation-1);
+    transition: box-shadow 0.2s;
+}
+
+.todo-card:hover {
+    box-shadow: var(--md-elevation-2);
+}
+
+.todo-card-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+.todo-card-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.375rem;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+}
+
+.icon-button.danger:hover:not(:disabled) {
+    color: var(--md-error);
+}
+
+.todo-items {
+    list-style: none;
+    margin: 0 -12px;
+    padding: 0;
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 2px 4px 2px 12px;
+    border-radius: var(--md-shape-small);
+}
+
+.todo-item:hover {
+    background: var(--md-state-hover);
+}
+
+.todo-text {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 0;
+    overflow-wrap: anywhere;
+    cursor: text;
+}
+
+.todo-text:focus-visible {
+    outline: 2px solid var(--md-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.todo-item.done .todo-text {
+    color: var(--md-on-surface-variant);
+    text-decoration: line-through;
+}
+
+.todo-date {
+    flex: none;
+    color: var(--md-on-surface-variant);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.todo-delete {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+}
+
+.todo-delete .material-symbols-rounded {
+    font-size: 18px;
+}
+
+.todo-item:hover .todo-delete,
+.todo-delete:focus-visible {
+    opacity: 1;
+}
+
+/* No hover on touch screens: keep the delete button visible */
+@media (hover: none) {
+    .todo-delete {
+        opacity: 1;
+    }
+}
+
+.todo-edit {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--md-primary);
+    border-radius: var(--md-shape-small);
+    background: var(--md-surface-container-lowest);
+    color: var(--md-on-surface);
+    font: inherit;
+}
+
+.todo-edit:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 1px var(--md-primary);
+}
+
+.todo-empty {
+    margin: 4px 0 8px;
+    color: var(--md-on-surface-variant);
+    font-size: 0.875rem;
+}
+
+.todo-add {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    color: var(--md-on-surface-variant);
+}
+
+.todo-add .material-symbols-rounded {
+    font-size: 20px;
+}
+
+.todo-add-input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    padding: 0 4px;
+    border: none;
+    border-bottom: 1px solid var(--md-outline-variant);
+    background: transparent;
+    color: var(--md-on-surface);
+    font: inherit;
+}
+
+.todo-add-input:focus {
+    outline: none;
+    border-bottom: 2px solid var(--md-primary);
+}
+
+.todo-add-input::placeholder {
+    color: var(--md-on-surface-variant);
+}
+
+.todo-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding-top: 48px;
+    color: var(--md-on-surface-variant);
+    text-align: center;
+}
+
+.todo-empty-state > .material-symbols-rounded {
+    font-size: 48px;
+    color: var(--md-primary);
+}
+
+.todo-empty-state p {
+    margin: 0;
 }
 
 /* ---------- Buttons ---------- */
@@ -942,6 +1231,71 @@ a {
     gap: 8px;
 }
 
+/* ToDo lists tab */
+#settings-overlay .settings-todo-lists {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+#settings-overlay .settings-todo-list {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 4px 0 12px;
+    border-radius: var(--md-shape-small);
+}
+
+#settings-overlay .settings-todo-list:hover {
+    background: var(--md-state-hover);
+}
+
+#settings-overlay .settings-todo-list > .material-symbols-rounded {
+    font-size: 20px;
+    color: var(--md-primary);
+}
+
+#settings-overlay .settings-todo-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#settings-overlay .settings-todo-count {
+    color: var(--md-on-surface-variant);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+#settings-overlay .settings-todo-list .icon-button {
+    width: 36px;
+    height: 36px;
+}
+
+#settings-overlay .settings-todo-list .icon-button .material-symbols-rounded {
+    font-size: 20px;
+}
+
+#settings-overlay .settings-todo-none {
+    padding: 8px 12px;
+    color: var(--md-on-surface-variant);
+}
+
+#settings-overlay .settings-todo-add {
+    display: flex;
+    gap: 8px;
+}
+
+#settings-overlay .settings-todo-add .modal-input {
+    flex: 1;
+    min-width: 0;
+}
+
 #settings-overlay [hidden] {
     display: none !important;
 }
@@ -1043,7 +1397,7 @@ a {
         display: none;
     }
 
-    #menu {
+    #sidebar {
         width: 220px;
         min-width: 220px;
     }

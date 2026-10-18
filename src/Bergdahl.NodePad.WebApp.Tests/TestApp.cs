@@ -21,6 +21,8 @@ namespace Bergdahl.NodePad.WebApp.Tests
         public string PagesPath => Path.Combine(Root, "Pages");
         public string AuthFilePath => Path.Combine(Root, CredentialStore.FileName);
         public WebApplicationFactory<Program> Factory { get; }
+        /// <summary>The app's clock; set <see cref="TestTimeProvider.Now"/> to control "today".</summary>
+        public TestTimeProvider Time { get; } = new();
 
         public TestApp()
         {
@@ -49,6 +51,7 @@ namespace Bergdahl.NodePad.WebApp.Tests
                 {
                     // Never touch a real nodepad.auth.json
                     services.AddSingleton(sp => new CredentialStore(sp.GetRequiredService<IConfiguration>(), AuthFilePath));
+                    services.AddSingleton<TimeProvider>(Time);
                 });
             });
         }
@@ -63,5 +66,17 @@ namespace Bergdahl.NodePad.WebApp.Tests
             Factory.Dispose();
             if (Directory.Exists(Root)) Directory.Delete(Root, true);
         }
+    }
+
+    /// <summary>
+    /// A clock that stays at <see cref="Now"/> (in UTC) until a test changes it.
+    /// </summary>
+    public sealed class TestTimeProvider : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
+
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
     }
 }
