@@ -19,7 +19,7 @@ public class NotesTools
         "A note's title is its first '# ' heading. Tags are stored separately from the content, normalized to lowercase. " +
         "Use search_notes or list_notes to find notes before reading or editing, and read a note before updating it, " +
         "since update_note replaces the whole content. Notes cannot be deleted through this server. " +
-        "There are also named ToDo lists (list_todos, create_todo_list, add_todo, set_todo_done); items are addressed by " +
+        "There are also named ToDo lists (list_todos, create_todo_list, add_todo, set_todo_done, edit_todo, remove_todo); items are addressed by " +
         "the list name and the item's index as returned by list_todos, and done items older than two weeks are hidden unless asked for.";
 
     public record NoteContent(string Path, string Title, string[] Tags, DateTime LastModifiedUtc, string Content);

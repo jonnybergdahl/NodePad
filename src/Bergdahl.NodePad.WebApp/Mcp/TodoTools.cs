@@ -6,13 +6,14 @@ using ModelContextProtocol.Server;
 namespace Bergdahl.NodePad.WebApp.Mcp;
 
 /// <summary>
-/// MCP tools for NodePad's ToDo lists. Like the note tools, there is deliberately no delete tool.
+/// MCP tools for NodePad's ToDo lists. Single items can be removed, but there is deliberately no tool
+/// that deletes a whole list (or a note).
 /// </summary>
 [McpServerToolType]
 public class TodoTools
 {
     [McpServerTool(Name = "list_todos", Title = "List ToDo lists", ReadOnly = true, OpenWorld = false)]
-    [Description("Returns all ToDo lists with their items. Each item has an index (used by set_todo_done), its text, " +
+    [Description("Returns all ToDo lists with their items. Each item has an index (used by set_todo_done, edit_todo and remove_todo), its text, " +
                  "whether it is done and the date it was done. Open items come first. Done items older than two weeks " +
                  "are left out (hiddenDoneCount says how many) unless includeOldDone is true.")]
     public static List<TodoList> ListTodos(
@@ -51,5 +52,28 @@ public class TodoTools
         [Description("True to check the item, false to uncheck it.")] bool done = true)
     {
         return NotesTools.Run(() => todos.UpdateItem(list, index, done: done));
+    }
+
+    [McpServerTool(Name = "edit_todo", Title = "Edit ToDo item", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
+    [Description("Changes an item's text and returns the updated list. The done state and done date are kept. " +
+                 "Get the index from list_todos first, since indexes change when items are added or removed.")]
+    public static TodoList EditTodo(
+        TodoService todos,
+        [Description("Name of the list.")] string list,
+        [Description("Index of the item, as returned by list_todos.")] int index,
+        [Description("New text of the item, a single line.")] string text)
+    {
+        return NotesTools.Run(() => todos.UpdateItem(list, index, text: text));
+    }
+
+    [McpServerTool(Name = "remove_todo", Title = "Remove ToDo item", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+    [Description("Deletes one item from a list and returns the updated list. The indexes of later items move down by one. " +
+                 "Get the index from list_todos first, and prefer set_todo_done for finished items, since done items keep their date.")]
+    public static TodoList RemoveTodo(
+        TodoService todos,
+        [Description("Name of the list.")] string list,
+        [Description("Index of the item, as returned by list_todos.")] int index)
+    {
+        return NotesTools.Run(() => todos.DeleteItem(list, index));
     }
 }

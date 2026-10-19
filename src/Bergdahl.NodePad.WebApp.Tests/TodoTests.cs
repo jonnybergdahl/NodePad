@@ -211,7 +211,24 @@ namespace Bergdahl.NodePad.WebApp.Tests
             var error = await client.CallToolAsync("add_todo", new Dictionary<string, object?> { ["list"] = "Nope", ["text"] = "x" });
             Assert.True(error.IsError);
 
+            // edit_todo keeps the done state and date
+            list = Result(await client.CallToolAsync("edit_todo", new Dictionary<string, object?> { ["list"] = "Errands", ["index"] = 0, ["text"] = "Post office, parcel" }));
+            Assert.Equal("Post office, parcel", list.GetProperty("items")[0].GetProperty("text").GetString());
+            Assert.Equal("2026-10-18", list.GetProperty("items")[0].GetProperty("doneDate").GetString());
+            Assert.Equal("# Errands\n\n- [x] Post office, parcel ✅ 2026-10-18\n", ReadList("Errands"));
+
+            // remove_todo deletes just that item
+            Result(await client.CallToolAsync("add_todo", new Dictionary<string, object?> { ["list"] = "Errands", ["text"] = "Pharmacy" }));
+            list = Result(await client.CallToolAsync("remove_todo", new Dictionary<string, object?> { ["list"] = "Errands", ["index"] = 0 }));
+            Assert.Equal(new[] { "Pharmacy" }, Texts(list));
+            Assert.Equal(0, list.GetProperty("items")[0].GetProperty("index").GetInt32());
+            Assert.True((await client.CallToolAsync("remove_todo", new Dictionary<string, object?> { ["list"] = "Errands", ["index"] = 5 })).IsError);
+            Assert.True((await client.CallToolAsync("edit_todo", new Dictionary<string, object?> { ["list"] = "Errands", ["index"] = 0, ["text"] = " " })).IsError);
+
+            // Items can be removed, but whole lists (and notes) cannot be deleted over MCP
             var tools = (await client.ListToolsAsync()).Select(t => t.Name).ToArray();
+            Assert.Contains("edit_todo", tools);
+            Assert.Contains("remove_todo", tools);
             Assert.DoesNotContain(tools, name => name.Contains("delete"));
         }
     }

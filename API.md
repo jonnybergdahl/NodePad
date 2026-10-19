@@ -57,7 +57,9 @@ login, setup and change-password are rate limited to 5 requests per minute per c
     - create_todo_list(name): same as POST /api/todos/lists
     - add_todo(list, text): same as POST /api/todos/items
     - set_todo_done(list, index, done?): checks (default) or unchecks an item, same as PUT /api/todos/items with { done }
-  - There is no delete tool.
+    - edit_todo(list, index, text): changes an item's text and keeps its done state and date, same as PUT /api/todos/items with { text }
+    - remove_todo(list, index): deletes one item, same as DELETE /api/todos/items
+  - There are no tools that delete notes, folders or whole to do lists; remove_todo only deletes a single item.
 
 ## Pages
 
