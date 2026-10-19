@@ -1145,6 +1145,104 @@ a {
     outline-offset: 2px;
 }
 
+/* Insert link dialog (editor toolbar) */
+/* The link button is a custom toolbar item; Toast UI's wrapper already has the button margin */
+.toastui-editor-toolbar-item-wrapper > .toastui-editor-toolbar-icons {
+    margin: 0;
+    vertical-align: top;
+}
+
+#link-overlay .modal {
+    width: 560px;
+}
+
+#link-overlay .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+}
+
+#link-overlay label,
+#link-overlay .link-tree-label {
+    font-size: 0.875rem;
+    color: var(--md-on-surface-variant);
+}
+
+#link-overlay .hint {
+    margin: 8px 12px;
+    font-size: 0.875rem;
+    color: var(--md-on-surface-variant);
+}
+
+.link-tree {
+    height: 260px;
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-small);
+}
+
+.link-tree ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.link-tree ul ul {
+    padding-left: 20px;
+}
+
+.link-tree summary {
+    list-style: none;
+}
+
+.link-tree summary::-webkit-details-marker {
+    display: none;
+}
+
+.link-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+    border: none;
+    border-radius: var(--md-shape-full);
+    background: none;
+    color: var(--md-on-surface-variant);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.link-tree-item:hover {
+    background: var(--md-state-hover);
+    color: var(--md-on-surface);
+}
+
+.link-tree-item.selected {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+}
+
+.link-tree-item:focus-visible {
+    outline: 2px solid var(--md-primary);
+    outline-offset: -2px;
+}
+
+.link-tree-item .material-symbols-rounded {
+    flex: none;
+    font-size: 20px;
+}
+
+.link-tree details:not([open]) > summary .folder-open,
+.link-tree details[open] > summary .folder-closed {
+    display: none;
+}
+
 /* Settings dialog */
 #settings-overlay .modal {
     width: 560px;

@@ -165,7 +165,9 @@
     function returnUrl() {
         const url = new URLSearchParams(location.search).get('ReturnUrl') || new URLSearchParams(location.search).get('returnUrl') || '/';
         // Only allow local paths to avoid open redirects
-        return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\') ? url : '/';
+        const local = url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\') ? url : '/';
+        // The browser keeps the #/note part of a link through the sign-in redirect; carry it on to the note
+        return local.includes('#') ? local : local + location.hash;
     }
 
     async function post(url, body) {

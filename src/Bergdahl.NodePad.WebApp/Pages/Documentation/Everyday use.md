@@ -14,6 +14,11 @@
   - In view mode, tags show as chips — click them to filter the list of notes.
   - "Filter by tag" at the bottom of the tree lists all tags. Select one or more to show only the notes that have all of them.
 
+- Links between notes
+  - Every note has its own address, for example `http://<your-nodepad-host>/#/Documentation/Settings`. Bookmark it, share it, or open it in a new tab; the browser's back and forward buttons move between the notes you have opened. The To do page is at `/#todo`.
+  - To link to another note, use an ordinary Markdown link to its file, relative to the current note or starting with / for the Pages folder: `[Settings](Settings.md)`, `[Showcase](../Folder/folder.md)` or `[Home](/index.md)`. For names with spaces, use angle brackets or %20: `[Getting started](<Getting started.md>)`.
+  - Or let NodePad write the link: while editing, click the link button in the editor toolbar, then pick a note in the tree (double-click inserts it straight away). You can still type any URL there instead.
+
 - Search
   - Type in the search field in the top bar and press Enter. Results show the matching text; click one to open the note.
 

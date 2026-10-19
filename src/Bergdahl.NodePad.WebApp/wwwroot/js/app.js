@@ -139,7 +139,6 @@ function initTheme() {
 }
 
 function applyToastUITheme() {
-    const mode = getEffectiveTheme();
     // Recreate viewer with chosen theme
     if (viewer) {
         const markdown = typeof currentContent === 'string' && currentContent.length >= 0
@@ -155,35 +154,7 @@ function applyToastUITheme() {
         const editorContainer = document.getElementById('editor-edit');
         const height = editorContainer ? editorContainer.style.height || '100%' : '100%';
         editor.destroy();
-        const _csp = resolveCodeSyntaxPlugin();
-        editor = new toastui.Editor({
-            el: editorContainer,
-            initialEditType: 'markdown',
-            previewStyle: 'vertical',
-            height,
-            initialValue: md,
-            theme: mode === 'dark' ? 'dark' : 'default',
-            plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
-            hooks: {
-                addImageBlobHook: async (blob, callback) => {
-                    try {
-                        const fd = new FormData();
-                        fd.append('image', blob, blob.name || 'image');
-                        const resp = await fetch(`/api/uploads/images?pagePath=${encodeURIComponent(currentPath || '')}`, { method: 'POST', body: fd });
-                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                        const data = await resp.json();
-                        if (data && data.url) {
-                            callback(data.url, blob.name || 'image');
-                        } else {
-                            throw new Error('Invalid response');
-                        }
-                    } catch (err) {
-                        console.error('Image upload failed', err);
-                        if (typeof showToast === 'function') showToast('Image upload failed', 'danger');
-                    }
-                }
-            }
-        });
+        editor = createEditor(editorContainer, md, height);
     }
 }
 
@@ -235,6 +206,88 @@ const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 
+// Page addresses: the open note is shown in the URL as /#/Folder/Note (without .md), so notes can be
+// bookmarked, shared and linked to, and back/forward work. The bare address is the home page (index.md),
+// and the To do page is /#todo.
+const TODO_HASH = '#todo';
+
+function safeDecode(str) {
+    try { return decodeURIComponent(str); } catch { return str; }
+}
+
+function pageHash(path) {
+    return '#/' + path.replace(/\.md$/i, '').split('/').map(encodeURIComponent).join('/');
+}
+
+// Note path in a #/ address, or null when the hash is something else (an in-page anchor, #todo)
+function pathFromHash(hash) {
+    if (!hash || !hash.startsWith('#/')) return null;
+    const parts = hash.substring(2).split('/').filter(Boolean).map(safeDecode);
+    return parts.length ? parts.join('/') + '.md' : null;
+}
+
+function urlPagePath() {
+    return location.hash ? pathFromHash(location.hash) : 'index.md';
+}
+
+function setUrl(hash, replace = false) {
+    history[replace ? 'replaceState' : 'pushState'](null, '', hash || location.pathname + location.search);
+}
+
+// Puts the note in the address bar; replace is for renames, moves and deletes, which should not add history
+function setPageUrl(path, replace = false) {
+    if (urlPagePath() === path) return;
+    setUrl(path ? pageHash(path) : '', replace);
+}
+
+// Links between notes: a link to a .md file, relative to the open note or absolute from the Pages root
+// (/Folder/Note.md or /pages/Folder/Note.md), opens that note. Other relative links point at the file in Pages.
+function resolveNoteLink(href) {
+    // External links, mailto: and the like, in-page anchors and links already in the #/ form are left alone
+    if (!href || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)) return href;
+    const [, target, rest] = href.match(/^([^?#]*)(.*)$/);
+    const isNote = /\.md$/i.test(target);
+    const absolute = target.startsWith('/');
+    if (absolute && !isNote) return href;
+    const segments = absolute ? [] : currentPath.split('/').slice(0, -1);
+    for (const part of target.replace(/^\/pages\//i, '/').split('/')) {
+        if (!part || part === '.') continue;
+        if (part === '..') segments.pop(); else segments.push(safeDecode(part));
+    }
+    if (!segments.length) return href;
+    if (isNote) return pageHash(segments.join('/'));
+    return '/pages/' + segments.map(encodeURIComponent).join('/') + rest;
+}
+
+// Used by the viewer and by the editor preview
+const noteLinkRenderer = {
+    link(node, { entering, origin }) {
+        const result = origin();
+        if (entering) {
+            const href = resolveNoteLink(node.destination);
+            if (href !== node.destination) result.attributes.href = href;
+        }
+        return result;
+    }
+};
+
+// Shows what the address points at (back/forward, a clicked note link, an address typed or opened from outside)
+async function navigateToUrl() {
+    if (location.hash === TODO_HASH) {
+        if (!todoViewActive) await showTodoView();
+        // Staying put (unsaved changes): put the address of the open note back
+        if (!todoViewActive) setPageUrl(currentPath, true);
+        return;
+    }
+    const path = urlPagePath();
+    if (!path || (path === currentPath && !todoViewActive)) return;
+    expandAncestorsForPath(path, false);
+    await loadFile(path);
+    if (currentPath !== path) setPageUrl(currentPath, true);
+}
+
+window.addEventListener('hashchange', navigateToUrl);
+
 // Toast UI Viewer/Editor helpers with theme support
 const DEFAULT_WELCOME = '<h1>Welcome to NodePad!</h1>Select a file from the menu or create a new one.';
 let viewer = null;
@@ -249,14 +302,18 @@ function createViewer(initialMarkdown) {
         viewer: true,
         initialValue: typeof initialMarkdown === 'string' ? initialMarkdown : DEFAULT_WELCOME,
         theme: mode === 'dark' ? 'dark' : 'default',
-        plugins: _csp ? [[_csp, { highlighter: Prism }]] : []
+        plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
+        customHTMLRenderer: noteLinkRenderer
     });
 }
 
 createViewer();
 
-// Attempt to load default index.md on startup
+// Open the note (or To do page) in the address, otherwise attempt to load default index.md on startup
 async function initDefaultPage() {
+    if (location.hash === TODO_HASH || pathFromHash(location.hash)) {
+        return navigateToUrl();
+    }
     try {
         const resp = await fetch(`/api/pages/content?path=${encodeURIComponent('index.md')}`);
         if (resp.ok) {
@@ -492,6 +549,8 @@ function updateToolbar() {
         btnDelete.style.display = (currentPath || selectedFolderPath) ? 'inline-flex' : 'none';
         if (btnRename) btnRename.style.display = (currentPath || selectedFolderPath) ? 'inline-flex' : 'none';
     }
+    // Keep the address in sync after renames, moves and deletes (opening a note adds its own history entry)
+    if (!todoViewActive) setPageUrl(currentPath, true);
     // Keep breadcrumbs in sync with current selection
     renderBreadcrumbs();
     // Keep tags UI in sync
@@ -537,16 +596,35 @@ btnEdit.addEventListener('click', function() {
     const editorEl = document.getElementById('editor');
     editorEl.parentNode.insertBefore(editorContainer, editorEl);
 
-    // Skapa editor med syntax highlighting
+    editor = createEditor(editorContainer, currentContent, '100%');
+
+    originalContent = currentContent;
+
+    isEditMode = true;
+    updateToolbar();
+});
+
+// Skapa editor med syntax highlighting
+function createEditor(el, markdown, height) {
     const _csp = resolveCodeSyntaxPlugin();
-    editor = new toastui.Editor({
-        el: editorContainer,
+    return new toastui.Editor({
+        el,
         initialEditType: 'markdown',
         previewStyle: 'vertical',
-        height: '100%',
-        initialValue: currentContent,
+        height,
+        initialValue: markdown,
         theme: getEffectiveTheme() === 'dark' ? 'dark' : 'default',
         plugins: _csp ? [[_csp, { highlighter: Prism }]] : [],
+        customHTMLRenderer: noteLinkRenderer,
+        // Toast UI's default toolbar, with its link button replaced by the one that can also pick a note
+        toolbarItems: [
+            ['heading', 'bold', 'italic', 'strike'],
+            ['hr', 'quote'],
+            ['ul', 'ol', 'task', 'indent', 'outdent'],
+            ['table', 'image', createLinkToolbarItem()],
+            ['code', 'codeblock'],
+            ['scrollSync'],
+        ],
         hooks: {
             addImageBlobHook: async (blob, callback) => {
                 try {
@@ -567,12 +645,7 @@ btnEdit.addEventListener('click', function() {
             }
         }
     });
-
-    originalContent = currentContent;
-
-    isEditMode = true;
-    updateToolbar();
-});
+}
 
 btnCancel.addEventListener('click', async function() {
     if (hasUnsavedChanges()) {
@@ -1073,6 +1146,7 @@ function attachRootDropzoneEvents(){
             }
             // Reload menu to reflect changes
             try { await loadMenu(false, true); } catch {}
+            updateToolbar();
         } catch (err){
             console.error('Move to root failed', err);
             showToast && showToast('Move failed', 'error');
@@ -1180,6 +1254,8 @@ menu.addEventListener('click', function(e) {
     if (e.target.classList.contains('folder-item') || e.target.closest('.folder-item')) {
         const folderItem = e.target.classList.contains('folder-item') ? e.target : e.target.closest('.folder-item');
         hideTodoView();
+        // Leaving the To do page shows the open note again
+        if (location.hash === TODO_HASH) setPageUrl(currentPath);
         currentFolderPath = folderItem.dataset.folderPath;
         selectedFolderPath = currentFolderPath;
         // Re-render to show selected state on the clicked folder
@@ -1277,6 +1353,7 @@ async function loadFile(path) {
 
     hideTodoView();
     currentPath = path;
+    setPageUrl(path);
     viewer.setMarkdown('Loading...');
 
     try {

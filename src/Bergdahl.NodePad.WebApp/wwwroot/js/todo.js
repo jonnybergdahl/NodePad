@@ -1,6 +1,6 @@
 // ToDo lists page, opened from the ToDo entry at the top of the menu.
 // Loaded before app.js; uses its helpers (showModal, showToast, hasUnsavedChanges, saveFile, cancelEdit,
-// loadMenu) only when the user acts, after both scripts have loaded.
+// loadMenu, setUrl, TODO_HASH) only when the user acts, after both scripts have loaded.
 
 const todoNav = document.getElementById('todo-nav');
 const todoView = document.getElementById('todo-view');
@@ -31,6 +31,7 @@ async function showTodoView() {
     }
 
     todoViewActive = true;
+    if (location.hash !== TODO_HASH) setUrl(TODO_HASH);
     TODO_REPLACES.forEach(sel => document.querySelector(sel)?.classList.add('hidden'));
     todoView.hidden = false;
     todoNav.classList.add('selected');
