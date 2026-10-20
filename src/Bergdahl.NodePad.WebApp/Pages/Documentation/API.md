@@ -195,8 +195,13 @@ A list is returned as { name, items: [{ index, text, done, doneDate? }], hiddenD
 
 Every change below returns the updated list (or nothing for a deleted list) and accepts includeOldDone=true. Errors: 400 for an empty or invalid name or text, 404 for an unknown list or index, 409 when the list name is taken.
 
+When the Home Assistant sync is on (see Settings), every change is also made in Home Assistant in the background, and changes made there show up in the lists.
+
 - GET /api/todos?includeOldDone=true|false
   - Returns all lists, sorted by name.
+
+- GET /api/todos/events
+  - Server-sent events (text/event-stream). Sends a message (data: a change counter) whenever a list changes, whether through this API, the MCP tools or Home Assistant; changes in quick succession become one message. A comment line is sent every 30 seconds to keep the connection open. The To do page uses it to update by itself.
 
 - POST /api/todos/lists
   - Body: { name }. Creates an empty list. Characters that are not allowed in file names become "-".
@@ -237,6 +242,15 @@ Every change below returns the updated list (or nothing for a deleted list) and 
   - Body: { allowedHosts?, pagesDirectory?, backupDirectory? }. Only the given values are changed in nodepad.json, and missing directories are created. An empty value removes the setting, so the default is used.
   - nodepad.json is created if it does not exist (it is not part of the published output).
   - Returns the updated settings. A changed Pages directory takes effect after a restart.
+
+- GET /api/settings/home-assistant
+  - Returns { url, active, hasToken, connected, lastSync, lastError, connectionError } for the Home Assistant sync of the to do lists. The token itself is never returned.
+  - connected: whether NodePad is connected to Home Assistant right now. lastSync: when a sync last finished. lastError: the last problem, cleared by the next successful sync.
+
+- POST /api/settings/home-assistant
+  - Body: { url, token?, active }. Saved in nodepad.auth.json; an empty token keeps the saved one. url must start with http:// or https://, and active=true needs both an address and a token (400 otherwise).
+  - While active, the address and token are checked: connectionError is null when Home Assistant answered, otherwise what went wrong. Changed settings make NodePad reconnect, which syncs all lists.
+  - Returns the same as GET.
 
 ## Notes
 

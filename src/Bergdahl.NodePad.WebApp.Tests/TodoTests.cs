@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -72,6 +73,49 @@ namespace Bergdahl.NodePad.WebApp.Tests
             // Unchecking removes the date
             await Json(await http.PutAsJsonAsync("/api/todos/items?list=Groceries&index=1", new { done = false }));
             Assert.Equal("# Groceries\n\n- [ ] Milk\n- [ ] Eggs\n", ReadList("Groceries"));
+        }
+
+        [Fact]
+        public async Task Changes_Are_Reported_On_The_Event_Stream()
+        {
+            var http = await SignedInClient();
+            WriteList("Groceries", "# Groceries\n\n- [ ] Milk\n");
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var response = await http.GetAsync("/api/todos/events", HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+            using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(timeout.Token));
+
+            async Task<string> NextData()
+            {
+                while (true)
+                {
+                    var line = await reader.ReadLineAsync(timeout.Token);
+                    Assert.NotNull(line);
+                    if (line!.StartsWith("data: ")) return line["data: ".Length..];
+                }
+            }
+
+            // Wait for the stream to be set up before changing anything
+            Assert.StartsWith("retry: ", await reader.ReadLineAsync(timeout.Token));
+
+            await Json(await http.PutAsJsonAsync("/api/todos/items?list=Groceries&index=0", new { done = true }));
+            var first = long.Parse(await NextData());
+
+            // Changes in quick succession may become one message; the last one has the latest version
+            await Json(await http.PostAsJsonAsync("/api/todos/items?list=Groceries", new { text = "Eggs" }));
+            await Json(await http.PostAsJsonAsync("/api/todos/items?list=Groceries", new { text = "Bread" }));
+            var latest = long.Parse(await NextData());
+            if (latest < first + 2) latest = long.Parse(await NextData());
+            Assert.Equal(first + 2, latest);
+        }
+
+        [Fact]
+        public async Task The_Event_Stream_Requires_Sign_In()
+        {
+            var response = await _app.CreateClient().GetAsync("/api/todos/events");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
         [Fact]

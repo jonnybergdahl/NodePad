@@ -6,6 +6,7 @@ Open Settings with the gear button in the top bar.
 - Password tab: change your password.
 - MCP Server tab: create or revoke the API key for AI assistants (MCP).
 - To do lists tab: create, rename and delete to do lists. Deleting a list also deletes its items.
+- Home Assistant tab: the address and access token of Home Assistant, and whether the to do lists are synced with it (see "Syncing with Home Assistant" under To do lists).
 
 Some options can only be set by editing nodepad.json (or appsettings.json):
 

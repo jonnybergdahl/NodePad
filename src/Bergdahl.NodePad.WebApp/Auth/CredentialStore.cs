@@ -15,6 +15,11 @@ public class CredentialStore
     public const string FileName = "nodepad.auth.json";
     private const string ApiKeyPrefix = "np_";
 
+    /// <summary>
+    /// Taken around every read-modify-write of nodepad.auth.json, which also holds the Home Assistant settings.
+    /// </summary>
+    public static readonly object FileLock = new();
+
     private readonly IConfiguration _configuration;
     private readonly string _authFilePath;
     private readonly object _lock = new();
@@ -109,6 +114,7 @@ public class CredentialStore
 
     private void Update(Func<AuthSettings, AuthSettings> change)
     {
+        lock (FileLock)
         lock (_lock)
         {
             var updated = change(CurrentUnlocked());

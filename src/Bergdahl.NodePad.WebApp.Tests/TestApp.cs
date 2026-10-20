@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using Bergdahl.NodePad.WebApp.Auth;
+using Bergdahl.NodePad.WebApp.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +18,8 @@ namespace Bergdahl.NodePad.WebApp.Tests
     /// </summary>
     public sealed class TestApp : IDisposable
     {
+        private readonly bool _ownsRoot;
+
         public string Root { get; }
         public string PagesPath => Path.Combine(Root, "Pages");
         public string AuthFilePath => Path.Combine(Root, CredentialStore.FileName);
@@ -24,9 +27,13 @@ namespace Bergdahl.NodePad.WebApp.Tests
         /// <summary>The app's clock; set <see cref="TestTimeProvider.Now"/> to control "today".</summary>
         public TestTimeProvider Time { get; } = new();
 
-        public TestApp()
+        /// <param name="settings">Extra configuration, as if it were in nodepad.json or nodepad.auth.json.</param>
+        /// <param name="root">The temp folder to use, for tests that run the app more than once on the same files;
+        /// the test removes it.</param>
+        public TestApp(IDictionary<string, string?>? settings = null, string? root = null)
         {
-            Root = Path.Combine(Path.GetTempPath(), "NodePad_AppTest_" + Guid.NewGuid().ToString("N"));
+            _ownsRoot = root == null;
+            Root = root ?? NewRoot();
             Directory.CreateDirectory(Root);
 
             Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -46,15 +53,19 @@ namespace Bergdahl.NodePad.WebApp.Tests
                         ["PagesDirectory"] = PagesPath,
                         ["BackupDirectory"] = Path.Combine(Root, "Backups"),
                     });
+                    if (settings != null) config.AddInMemoryCollection(settings);
                 });
                 builder.ConfigureTestServices(services =>
                 {
                     // Never touch a real nodepad.auth.json
                     services.AddSingleton(sp => new CredentialStore(sp.GetRequiredService<IConfiguration>(), AuthFilePath));
+                    services.AddSingleton(sp => new HomeAssistantSettingsStore(sp.GetRequiredService<IConfiguration>(), AuthFilePath));
                     services.AddSingleton<TimeProvider>(Time);
                 });
             });
         }
+
+        public static string NewRoot() => Path.Combine(Path.GetTempPath(), "NodePad_AppTest_" + Guid.NewGuid().ToString("N"));
 
         public CredentialStore Credentials => Factory.Services.GetRequiredService<CredentialStore>();
 
@@ -64,7 +75,7 @@ namespace Bergdahl.NodePad.WebApp.Tests
         public void Dispose()
         {
             Factory.Dispose();
-            if (Directory.Exists(Root)) Directory.Delete(Root, true);
+            if (_ownsRoot && Directory.Exists(Root)) Directory.Delete(Root, true);
         }
     }
 

@@ -16,6 +16,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - Switch between a light and a dark theme
 - Enjoy automatic, lightweight backups of your notes folder
 - Keep named to do lists: checked items get the date they were done and disappear two weeks later
+- Sync the to do lists with Home Assistant, both ways
 - Let AI assistants such as Claude read and edit your notes through the built-in MCP server
 
 ## Documentation

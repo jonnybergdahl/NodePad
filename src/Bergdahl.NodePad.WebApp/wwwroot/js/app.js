@@ -1612,7 +1612,7 @@ loadMenu();
 
     let originalSettings = null;
 
-    // Tabs: Settings, Password, MCP Server, To do lists. Save/Cancel only apply to the Settings tab.
+    // Tabs: Settings, Password, MCP Server, To do lists, Home Assistant. Save/Cancel only apply to the Settings tab.
     const settingsTabs = settingsOverlay ? Array.from(settingsOverlay.querySelectorAll('.settings-tab')) : [];
 
     function selectSettingsTab(name, focus = false) {
@@ -1628,6 +1628,7 @@ loadMenu();
         if (settingsSaveBtn) settingsSaveBtn.hidden = !isGeneral;
         if (settingsCancelBtn) settingsCancelBtn.textContent = isGeneral ? 'Cancel' : 'Close';
         if (name === 'todo') loadSettingsTodoLists();
+        if (name === 'ha') loadHomeAssistant();
     }
 
     settingsTabs.forEach((tab, index) => {
@@ -1816,6 +1817,73 @@ loadMenu();
     if (mcpRevokeBtn) mcpRevokeBtn.addEventListener('click', revokeMcpKey);
     if (mcpCopyBtn) mcpCopyBtn.addEventListener('click', copyMcpKey);
     if (settingsBtn) settingsBtn.addEventListener('click', loadMcpStatus);
+
+    // Home Assistant sync of the to do lists
+    const haPanel = document.getElementById('settings-panel-ha');
+    const haUrlInput = document.getElementById('settings-ha-url');
+    const haTokenInput = document.getElementById('settings-ha-token');
+    const haActiveInput = document.getElementById('settings-ha-active');
+    const haStatus = document.getElementById('settings-ha-status');
+    const haSaveBtn = document.getElementById('settings-ha-save-btn');
+
+    function renderHomeAssistant(data, showInputs) {
+        if (showInputs) {
+            if (haUrlInput) haUrlInput.value = data.url || '';
+            if (haActiveInput) haActiveInput.checked = !!data.active;
+            if (haTokenInput) {
+                // The token is never sent back; an empty field keeps the saved one
+                haTokenInput.value = '';
+                haTokenInput.placeholder = data.hasToken ? 'Saved; leave empty to keep it' : '';
+            }
+        }
+        if (!haStatus) return;
+        let text;
+        if (!data.active) text = 'Syncing is off.';
+        else if (data.connectionError) text = `Could not connect: ${data.connectionError}`;
+        else if (data.connected) text = 'Connected.';
+        else text = data.lastError ? `Not connected: ${data.lastError}. Retrying.` : 'Connecting…';
+        if (data.active && data.lastSync) text += ` Last synced ${new Date(data.lastSync).toLocaleString()}.`;
+        if (data.active && data.connected && data.lastError) text += ` Last error: ${data.lastError}`;
+        haStatus.textContent = text;
+    }
+
+    async function loadHomeAssistant(showInputs = true) {
+        try {
+            const res = await fetch('/api/settings/home-assistant');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            renderHomeAssistant(await res.json(), showInputs);
+        } catch {
+            if (haStatus) haStatus.textContent = 'Could not load the Home Assistant settings.';
+        }
+    }
+
+    async function saveHomeAssistant() {
+        try {
+            const res = await fetch('/api/settings/home-assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: haUrlInput ? haUrlInput.value : '',
+                    token: haTokenInput ? haTokenInput.value : '',
+                    active: haActiveInput ? haActiveInput.checked : false,
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                showToast && showToast(data.error || 'Failed to save the Home Assistant settings', 'error');
+                return;
+            }
+            renderHomeAssistant(data, true);
+            showToast && showToast(data.connectionError ? 'Saved, but Home Assistant could not be reached' : 'Home Assistant settings saved',
+                data.connectionError ? 'warning' : 'success');
+            // The sync connects in the background
+            setTimeout(() => { if (haPanel && !haPanel.hidden) loadHomeAssistant(false); }, 2000);
+        } catch {
+            showToast && showToast('Failed to save the Home Assistant settings', 'error');
+        }
+    }
+
+    if (haSaveBtn) haSaveBtn.addEventListener('click', saveHomeAssistant);
 })();
 
 // Sign out

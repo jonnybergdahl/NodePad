@@ -96,6 +96,80 @@ async function todoChange(method, url, body, { focusAdd } = {}) {
 const listQuery = name => `list=${encodeURIComponent(name)}`;
 
 // ---------------------------------------------------------------------
+// Live updates: the server reports every change to the lists (from this page, another browser,
+// the MCP tools or Home Assistant) on /api/todos/events, and the open views reload.
+// ---------------------------------------------------------------------
+
+let todoRefreshPending = false;
+let todoEvents = null;
+
+function connectTodoEvents() {
+    let opened = false;
+    todoEvents = new EventSource('/api/todos/events');
+    todoEvents.addEventListener('open', () => {
+        // Changes may have been missed while the connection was down
+        if (opened) refreshTodoViews();
+        opened = true;
+    });
+    todoEvents.addEventListener('message', refreshTodoViews);
+    todoEvents.addEventListener('error', () => {
+        // EventSource retries by itself after a network error, but gives up on an error response
+        // (such as a proxy answering while the app restarts)
+        if (todoEvents.readyState === EventSource.CLOSED) setTimeout(connectTodoEvents, 5000);
+    });
+}
+
+function refreshTodoViews() {
+    if (todoViewActive) refreshTodoPage();
+    const settingsPanel = document.getElementById('settings-panel-todo');
+    if (document.getElementById('settings-overlay')?.classList.contains('active') && settingsPanel && !settingsPanel.hidden) {
+        loadSettingsTodoLists();
+    }
+}
+
+// Reloads the ToDo page without disturbing the user: an item being edited holds the refresh back
+// until the edit is done, and text typed in the "Add item" fields and the focus are kept.
+async function refreshTodoPage() {
+    const editing = () => todoView.querySelector('.todo-edit') !== null;
+    if (editing()) {
+        todoRefreshPending = true;
+        return;
+    }
+    let lists;
+    try {
+        lists = await todoRequest('GET', `/api/todos${todoOldParam('?')}`);
+    } catch {
+        return; // The next change or reconnect tries again
+    }
+    if (!todoViewActive) return;
+    if (editing()) {
+        todoRefreshPending = true;
+        return;
+    }
+    todoRefreshPending = false;
+
+    const active = document.activeElement;
+    const focusList = active?.classList.contains('todo-add-input') ? active.closest('.todo-card')?.dataset.list : null;
+    const drafts = new Map([...todoView.querySelectorAll('.todo-card')]
+        .map(card => [card.dataset.list, card.querySelector('.todo-add-input')?.value || ''])
+        .filter(([, text]) => text));
+
+    todoLists = lists;
+    renderTodos();
+    todoView.querySelectorAll('.todo-card').forEach(card => {
+        const input = card.querySelector('.todo-add-input');
+        if (input && drafts.has(card.dataset.list)) input.value = drafts.get(card.dataset.list);
+        if (input && card.dataset.list === focusList) input.focus();
+    });
+}
+
+function runPendingTodoRefresh() {
+    if (todoRefreshPending) refreshTodoPage();
+}
+
+connectTodoEvents();
+
+// ---------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------
 
@@ -287,6 +361,7 @@ function startEditTodoText(textEl) {
         } else {
             renderTodos();
         }
+        runPendingTodoRefresh();
     };
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); finish(true); }

@@ -21,12 +21,16 @@ public class TodoService
 
     private readonly NotesService _notes;
     private readonly TimeProvider _time;
+    private readonly HomeAssistantSync _homeAssistant;
+    private readonly TodoChangeNotifier _changes;
     private readonly ILogger<TodoService> _logger;
 
-    public TodoService(NotesService notes, TimeProvider time, ILogger<TodoService> logger)
+    public TodoService(NotesService notes, TimeProvider time, HomeAssistantSync homeAssistant, TodoChangeNotifier changes, ILogger<TodoService> logger)
     {
         _notes = notes;
         _time = time;
+        _homeAssistant = homeAssistant;
+        _changes = changes;
         _logger = logger;
     }
 
@@ -69,6 +73,8 @@ public class TodoService
         }
         _logger.LogInformation("ToDo list created: {Name}", cleanName);
         _notes.RequestBackup();
+        _changes.Notify();
+        _homeAssistant.ListChanged(cleanName);
         return GetList(cleanName);
     }
 
@@ -78,9 +84,11 @@ public class TodoService
     public TodoList RenameList(string name, string newName, bool includeOldDone = false)
     {
         var cleanNewName = CleanListName(newName);
+        string oldName;
         lock (WriteLock)
         {
             var oldPath = RequireListPath(name);
+            oldName = Path.GetFileNameWithoutExtension(oldPath);
             var newPath = ListPath(cleanNewName);
             var sameFile = string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase);
             if (!sameFile && File.Exists(newPath)) throw NotesException.Conflict("A to do list with that name already exists");
@@ -107,17 +115,25 @@ public class TodoService
         }
         _logger.LogInformation("ToDo list renamed: {Old} -> {New}", name, cleanNewName);
         _notes.RequestBackup();
+        _changes.Notify();
+        // Local To-do lists cannot be renamed through Home Assistant's API, so the list is recreated there
+        _homeAssistant.ListDeleted(oldName);
+        _homeAssistant.ListChanged(cleanNewName);
         return GetList(cleanNewName, includeOldDone);
     }
 
     public void DeleteList(string name)
     {
+        string path;
         lock (WriteLock)
         {
-            File.Delete(RequireListPath(name));
+            path = RequireListPath(name);
+            File.Delete(path);
         }
         _logger.LogInformation("ToDo list deleted: {Name}", name);
         _notes.RequestBackup();
+        _changes.Notify();
+        _homeAssistant.ListDeleted(Path.GetFileNameWithoutExtension(path));
     }
 
     // ---------------------------------------------------------------------
@@ -130,21 +146,22 @@ public class TodoService
     public TodoList AddItem(string list, string text, bool includeOldDone = false)
     {
         var cleanText = CleanItemText(text);
-        return Modify(list, includeOldDone, (lines, items) =>
+        return Modify(list, includeOldDone, (lines, items) => InsertItemLine(lines, items, $"- [ ] {cleanText}"));
+    }
+
+    private static void InsertItemLine(List<string> lines, List<int> items, string line)
+    {
+        if (items.Count > 0)
         {
-            var line = $"- [ ] {cleanText}";
-            if (items.Count > 0)
-            {
-                lines.Insert(items[^1] + 1, line);
-            }
-            else
-            {
-                // Keep a blank line between the heading and the first item
-                while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[^1])) lines.RemoveAt(lines.Count - 1);
-                if (lines.Count > 0) lines.Add(string.Empty);
-                lines.Add(line);
-            }
-        });
+            lines.Insert(items[^1] + 1, line);
+        }
+        else
+        {
+            // Keep a blank line between the heading and the first item
+            while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[^1])) lines.RemoveAt(lines.Count - 1);
+            if (lines.Count > 0) lines.Add(string.Empty);
+            lines.Add(line);
+        }
     }
 
     /// <summary>
@@ -167,6 +184,58 @@ public class TodoService
     public TodoList DeleteItem(string list, int index, bool includeOldDone = false)
     {
         return Modify(list, includeOldDone, (lines, items) => lines.RemoveAt(RequireItemLine(items, index)));
+    }
+
+    /// <summary>
+    /// A change made by <see cref="ApplyEdits"/>. Indexes are those of the list given to the plan.
+    /// </summary>
+    public abstract record TodoEdit
+    {
+        public sealed record Update(int Index, string? Text = null, bool? Done = null) : TodoEdit;
+        public sealed record Remove(int Index) : TodoEdit;
+        public sealed record Add(string Text, bool Done) : TodoEdit;
+    }
+
+    /// <summary>
+    /// Applies a batch of changes in one write, for the Home Assistant sync. The plan gets the list
+    /// (visible items) while the file is locked, so the indexes it returns cannot go stale. Unlike the
+    /// other changes, this does not notify Home Assistant. Returns the list after the changes.
+    /// </summary>
+    public TodoList ApplyEdits(string list, Func<TodoList, IReadOnlyList<TodoEdit>> plan)
+    {
+        string path;
+        lock (WriteLock)
+        {
+            path = RequireListPath(list);
+            var name = Path.GetFileNameWithoutExtension(path);
+            var lines = ReadLines(path, out var newline);
+            var edits = plan(BuildList(name, string.Join("\n", lines), includeOldDone: false));
+            if (edits.Count == 0) return GetList(name);
+
+            var items = ItemLines(lines);
+            foreach (var update in edits.OfType<TodoEdit.Update>())
+            {
+                var lineIndex = RequireItemLine(items, update.Index);
+                var item = ParseItem(lines[lineIndex])!;
+                var newDone = update.Done ?? item.Done;
+                DateOnly? date = newDone ? (item.Done ? item.DoneDate : Today) : null;
+                lines[lineIndex] = FormatItem(item.Indent, item.Bullet, newDone, update.Text == null ? item.Text : CleanItemText(update.Text), date);
+            }
+            // From the bottom up, so the line numbers of the remaining items stay valid
+            foreach (var lineIndex in edits.OfType<TodoEdit.Remove>().Select(r => RequireItemLine(items, r.Index)).Distinct().OrderDescending())
+            {
+                lines.RemoveAt(lineIndex);
+            }
+            foreach (var add in edits.OfType<TodoEdit.Add>())
+            {
+                InsertItemLine(lines, ItemLines(lines), FormatItem(string.Empty, "-", add.Done, CleanItemText(add.Text), add.Done ? Today : null));
+            }
+            WriteLines(path, lines, newline);
+        }
+        _logger.LogInformation("ToDo list updated from Home Assistant: {Name}", list);
+        _notes.RequestBackup();
+        _changes.Notify();
+        return GetList(Path.GetFileNameWithoutExtension(path));
     }
 
     // ---------------------------------------------------------------------
@@ -228,16 +297,24 @@ public class TodoService
         {
             path = RequireListPath(list);
             var lines = ReadLines(path, out var newline);
-            var items = lines.Select((line, i) => (line, i))
-                .Where(x => ParseItem(x.line) != null)
-                .Select(x => x.i)
-                .ToList();
-            change(lines, items);
+            change(lines, ItemLines(lines));
             WriteLines(path, lines, newline);
         }
         _notes.RequestBackup();
-        return GetList(Path.GetFileNameWithoutExtension(path), includeOldDone);
+        _changes.Notify();
+        var name = Path.GetFileNameWithoutExtension(path);
+        _homeAssistant.ListChanged(name);
+        return GetList(name, includeOldDone);
     }
+
+    /// <summary>
+    /// The line numbers of the items, in file order.
+    /// </summary>
+    private static List<int> ItemLines(List<string> lines) =>
+        lines.Select((line, i) => (line, i))
+            .Where(x => ParseItem(x.line) != null)
+            .Select(x => x.i)
+            .ToList();
 
     private static int RequireItemLine(List<int> items, int index)
     {

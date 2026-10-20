@@ -1,3 +1,5 @@
+using System.Threading.Channels;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Bergdahl.NodePad.WebApp.Services;
 
@@ -25,6 +27,67 @@ public class TodosController : NotesApiController
     public IActionResult GetLists([FromQuery] bool includeOldDone = false)
     {
         return Execute("reading ToDo lists", null, () => Ok(_todos.GetLists(includeOldDone)));
+    }
+
+    /// <summary>
+    /// Server-sent events: a "data: &lt;version&gt;" message whenever a list changes, from any source
+    /// (this API, the MCP tools, Home Assistant). The page reloads the lists when it gets one.
+    /// </summary>
+    [HttpGet("events")]
+    public async Task Events([FromServices] TodoChangeNotifier changes, [FromServices] IHostApplicationLifetime lifetime)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+        // Holds only the latest version, so changes made while a message is being sent become one message
+        var pending = Channel.CreateBounded<long>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest });
+        void OnChanged(long version) => pending.Writer.TryWrite(version);
+        changes.Changed += OnChanged;
+
+        // End the stream when the browser goes away or the app shuts down
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted, lifetime.ApplicationStopping);
+        var ct = stop.Token;
+        try
+        {
+            await WriteEvent($"retry: {RetryMilliseconds}\n: connected\n\n", ct);
+            while (!ct.IsCancellationRequested)
+            {
+                using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                wait.CancelAfter(PingInterval);
+                try
+                {
+                    await pending.Reader.WaitToReadAsync(wait.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // Keeps proxies from closing an idle connection
+                    await WriteEvent(": ping\n\n", ct);
+                    continue;
+                }
+                // Let a burst of changes (a Home Assistant sync of several items) settle into one message
+                await Task.Delay(CoalesceDelay, ct);
+                if (pending.Reader.TryRead(out var version)) await WriteEvent($"data: {version}\n\n", ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The browser closed the page or the app is stopping
+        }
+        finally
+        {
+            changes.Changed -= OnChanged;
+        }
+    }
+
+    private const int RetryMilliseconds = 5000;
+    private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan CoalesceDelay = TimeSpan.FromMilliseconds(250);
+
+    private async Task WriteEvent(string text, CancellationToken ct)
+    {
+        await Response.WriteAsync(text, ct);
+        await Response.Body.FlushAsync(ct);
     }
 
     [HttpPost("lists")]

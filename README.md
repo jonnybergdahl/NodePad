@@ -25,6 +25,7 @@ A fast, lightweight notes web app that uses plain Markdown files. Create, organi
 - Switch between a light and a dark theme
 - Enjoy automatic, lightweight backups of your notes folder
 - Keep named to do lists: checked items get the date they were done and disappear two weeks later
+- Sync the to do lists with Home Assistant, both ways
 - Let AI assistants such as Claude read and edit your notes through the built-in MCP server
 
 ## Quick start
@@ -132,6 +133,21 @@ Each list is a Markdown file in the _ToDo folder in Pages, for example _ToDo/Gro
 
 You can edit these files in any editor: lines that are not items are left untouched, and done items without a date are always shown. The _ToDo folder is reserved for to do lists, so it is not shown in the note tree, search or tags, and notes cannot be created in it.
 
+### Syncing with Home Assistant
+
+NodePad can keep the to do lists in step with Home Assistant, so you can also check off items in the Home Assistant app, on a dashboard or by voice.
+
+1) In Home Assistant, create a long-lived access token: open your profile, go to the Security tab and click "Create token". The user must be an administrator, since NodePad creates the lists in Home Assistant.
+2) In NodePad, open Settings, go to the "Home Assistant" tab, enter the address of Home Assistant (for example http://homeassistant.local:8123) and the token, tick "Sync the to do lists" and click Save.
+
+How it works:
+- Each list gets a Local To-do list with the same name in Home Assistant, holding the open items and the done items of the last two weeks. If Home Assistant already has a Local To-do list with that name, it is used and the items of both are combined.
+- Items added, checked off, unchecked, changed or removed on either side change on the other side right away. Items are matched by their text, so changing an item's text in NodePad replaces it in Home Assistant. An open To do page shows changes made in Home Assistant without being reloaded.
+- If one side removes an item while the other side changes it, the item is removed.
+- Lists are created, renamed and deleted in NodePad, and Home Assistant follows: a renamed list is created again under its new name. Lists created in Home Assistant are not added to NodePad, and a list deleted in Home Assistant is created there again with NodePad's items.
+- NodePad stays connected to Home Assistant, and syncs all lists when it starts and whenever the connection comes back, so changes made on either side in the meantime are not lost. If Home Assistant cannot be reached, NodePad keeps trying; the "Home Assistant" tab shows the status.
+- The address and token are stored in nodepad.auth.json, and the state of the last sync in _ToDo/.homeassistant.json.
+
 ## Settings
 
 Open Settings with the gear button in the top bar.
@@ -140,6 +156,7 @@ Open Settings with the gear button in the top bar.
 - Password tab: change your password.
 - MCP Server tab: create or revoke the API key for AI assistants (MCP).
 - To do lists tab: create, rename and delete to do lists. Deleting a list also deletes its items.
+- Home Assistant tab: the address and access token of Home Assistant, and whether the to do lists are synced with it (see "Syncing with Home Assistant" under To do lists).
 
 Some options can only be set by editing nodepad.json (or appsettings.json):
 

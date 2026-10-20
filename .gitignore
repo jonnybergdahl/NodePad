@@ -8,6 +8,8 @@ Backups/
 Logs/
 Keys/
 nodepad.auth.json
+# Home Assistant sync state of the to do lists
+.homeassistant.json
 
 .DS_Store
 

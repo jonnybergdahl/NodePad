@@ -27,6 +27,15 @@ builder.Services.AddScoped<NotesService>();
 // ToDo lists in the _ToDo folder; TimeProvider supplies "today" for done dates (tests replace it)
 builder.Services.AddScoped<TodoService>();
 builder.Services.AddSingleton(TimeProvider.System);
+// Tells open browser pages (GET /api/todos/events) when the lists change
+builder.Services.AddSingleton<TodoChangeNotifier>();
+
+// Optional copy of the ToDo lists in Home Assistant; settings live in nodepad.auth.json with the account
+var authFilePath = Path.Combine(builder.Environment.ContentRootPath, CredentialStore.FileName);
+builder.Services.AddSingleton(sp => new HomeAssistantSettingsStore(sp.GetRequiredService<IConfiguration>(), authFilePath));
+builder.Services.AddHttpClient(HomeAssistantClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<HomeAssistantSync>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<HomeAssistantSync>());
 
 // Lägg till logging
 builder.Logging.ClearProviders();
@@ -38,7 +47,6 @@ builder.Services.Configure<FileLoggerOptions>(builder.Configuration.GetSection("
 builder.Services.AddSingleton<ILoggerProvider, FileLoggerProvider>();
 
 // Authentication: a single account stored in nodepad.auth.json, signed in with a cookie
-var authFilePath = Path.Combine(builder.Environment.ContentRootPath, CredentialStore.FileName);
 builder.Services.AddSingleton(sp => new CredentialStore(sp.GetRequiredService<IConfiguration>(), authFilePath));
 
 // Persist data protection keys so auth cookies survive restarts and IIS app pool recycles
@@ -145,7 +153,11 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Browsers ask every time (a cheap 304 when unchanged), so an updated app.js or styles.css is used at once
+    OnPrepareResponse = context => context.Context.Response.Headers.CacheControl = "no-cache",
+});
 
 // Serve PagesDirectory under /pages for embedded assets (images placed next to markdown files)
 var pagesDir = builder.Configuration.GetValue<string>("PagesDirectory") ?? Path.Combine(Directory.GetCurrentDirectory(), "Pages");

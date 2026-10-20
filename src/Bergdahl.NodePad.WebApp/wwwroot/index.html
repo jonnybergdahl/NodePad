@@ -109,6 +109,7 @@
             <button class="settings-tab" role="tab" id="settings-tab-password" aria-controls="settings-panel-password" aria-selected="false" tabindex="-1" data-tab="password">Password</button>
             <button class="settings-tab" role="tab" id="settings-tab-mcp" aria-controls="settings-panel-mcp" aria-selected="false" tabindex="-1" data-tab="mcp">MCP Server</button>
             <button class="settings-tab" role="tab" id="settings-tab-todo" aria-controls="settings-panel-todo" aria-selected="false" tabindex="-1" data-tab="todo">To do lists</button>
+            <button class="settings-tab" role="tab" id="settings-tab-ha" aria-controls="settings-panel-ha" aria-selected="false" tabindex="-1" data-tab="ha">Home Assistant</button>
         </div>
         <div class="modal-body">
             <div class="settings-panel" role="tabpanel" id="settings-panel-general" aria-labelledby="settings-tab-general">
@@ -166,6 +167,23 @@
                     <input type="text" id="settings-todo-name" class="modal-input" placeholder="Name of the new list" aria-label="Name of the new list">
                     <button id="settings-todo-add-btn" class="modal-btn modal-btn-primary">Add list</button>
                 </div>
+            </div>
+            <div class="settings-panel" role="tabpanel" id="settings-panel-ha" aria-labelledby="settings-tab-ha" hidden>
+                <p class="hint">Keep the to do lists in step with Home Assistant. Each list gets a Local To-do list with the same name there; items added, checked off or removed on either side change on the other.</p>
+                <div class="form-row">
+                    <label for="settings-ha-url">Home Assistant address</label>
+                    <input type="url" id="settings-ha-url" class="modal-input" placeholder="e.g. http://homeassistant.local:8123">
+                </div>
+                <div class="form-row">
+                    <label for="settings-ha-token">Long-lived access token (of an administrator)</label>
+                    <input type="password" id="settings-ha-token" class="modal-input" autocomplete="off">
+                </div>
+                <label class="settings-ha-active">
+                    <input type="checkbox" id="settings-ha-active">
+                    Sync the to do lists
+                </label>
+                <p id="settings-ha-status" class="hint" role="status"></p>
+                <button id="settings-ha-save-btn" class="modal-btn modal-btn-primary">Save</button>
             </div>
         </div>
         <div class="modal-footer">
