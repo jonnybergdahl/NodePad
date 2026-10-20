@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Bergdahl.NodePad.WebApp;
 using Bergdahl.NodePad.WebApp.Models;
 using Bergdahl.NodePad.WebApp.Services;
@@ -148,6 +149,25 @@ namespace Bergdahl.NodePad.WebApp.Tests
                 Assert.Contains("csharp", normalized);
                 Assert.Contains("dotnet", normalized);
                 Assert.Contains("asp.net", normalized);
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+        }
+
+        [Fact]
+        public void Structure_Paths_Match_Tags_Index_Keys()
+        {
+            var (controller, root, _) = CreateControllerWithTempRoot();
+            try
+            {
+                var relPath = "Home Assistant/Integrations/Nordpool.md";
+                Assert.IsType<ContentResult>(controller.SavePageContent(relPath, "content", tags: "energy"));
+
+                var structure = Assert.IsType<List<FileSystemEntity>>(Assert.IsType<OkObjectResult>(controller.GetFolderStructure(tags: "energy")).Value);
+                var file = structure[0].Children!.First().Children!.First();
+                Assert.Equal(relPath, file.Path);
+
+                var index = Assert.IsType<Dictionary<string, List<string>>>(Assert.IsType<OkObjectResult>(controller.GetTagsIndex()).Value);
+                Assert.Equal(new[] { "energy" }, index[file.Path]);
             }
             finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
         }

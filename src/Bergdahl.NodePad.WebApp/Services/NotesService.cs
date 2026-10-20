@@ -362,7 +362,7 @@ public class NotesService
     /// </summary>
     public Dictionary<string, List<string>> GetTagsIndex()
     {
-        return BuildNormalizedTagsIndex().ToDictionary(kv => kv.Key.Replace('\\', '/'), kv => kv.Value);
+        return BuildNormalizedTagsIndex();
     }
 
     public List<TagCount> GetTagCounts()
@@ -922,7 +922,7 @@ public class NotesService
         foreach (var file in EnumerateNoteFiles())
         {
             var tags = ReadTagsFromMeta(file).Select(NormalizeTag).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
-            dict[RelPath(file)] = tags;
+            dict[RelPath(file).Replace('\\', '/')] = tags;
         }
         return dict;
     }
@@ -964,7 +964,7 @@ public class NotesService
             .Select(entry => new FileSystemEntity
             {
                 Name = Path.GetFileName(entry),
-                Path = entry.Replace(rootPath, "").TrimStart(Path.DirectorySeparatorChar),
+                Path = RelPath(entry).Replace('\\', '/'),
                 Type = "file",
                 Children = null
             });
@@ -990,7 +990,7 @@ public class NotesService
             .Select(entry => new FileSystemEntity()
             {
                 Name = Path.GetFileName(entry),
-                Path = entry.Replace(rootPath, "").TrimStart(Path.DirectorySeparatorChar),
+                Path = RelPath(entry).Replace('\\', '/'),
                 Type = "directory",
                 Children = GetDirectoryStructure(entry)
             });
@@ -1004,7 +1004,7 @@ public class NotesService
         {
             if (string.Equals(n.Type, "file", StringComparison.OrdinalIgnoreCase))
             {
-                var tags = index.TryGetValue(n.Path.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), out var t)
+                var tags = index.TryGetValue(n.Path, out var t)
                     ? t
                     : new List<string>();
                 if (required.All(r => tags.Contains(r)))
