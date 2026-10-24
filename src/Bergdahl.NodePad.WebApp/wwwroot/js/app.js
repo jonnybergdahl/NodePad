@@ -851,7 +851,10 @@ function renderMenuHeader() {
 }
 
 function renderMenu(tree) {
+    // Keep the tree's scroll position, since the scroll container is replaced on every render
+    const scrollTop = document.getElementById('menu-tree')?.scrollTop || 0;
     menu.innerHTML = renderMenuHeader() + `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>`;
+    document.getElementById('menu-tree').scrollTop = scrollTop;
     try { attachRootDropzoneEvents(); } catch {}
 }
 
