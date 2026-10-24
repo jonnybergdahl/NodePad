@@ -93,7 +93,7 @@ The API key only grants access to /mcp, not to the rest of the app. Only a hash 
 - Tags and filtering
   - Add tags while editing using the tag field (comma separated). Tags are stored in lowercase.
   - In view mode, tags show as chips — click them to filter the list of notes.
-  - "Filter by tag" at the bottom of the tree lists all tags. Select one or more to show only the notes that have all of them.
+  - Click the filter button next to "Pages" at the top of the tree to pick tags from a list (type to find a tag). Select one or more to show only the notes that have all of them. Active filters show as chips above the tree; click a chip to remove it, or use "Clear" in the list.
 
 - Links between notes
   - Every note has its own address, for example `http://<your-nodepad-host>/#/Documentation/Settings`. Bookmark it, share it, or open it in a new tab; the browser's back and forward buttons move between the notes you have opened. The To do page is at `/#todo`.

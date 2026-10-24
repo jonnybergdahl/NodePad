@@ -82,14 +82,7 @@ if (tagsView) {
     tagsView.addEventListener('click', (e) => {
         const chip = e.target.closest('.tag-chip.selectable');
         if (!chip) return;
-        const t = normalizeTag(chip.getAttribute('data-tag'));
-        const set = new Set(tagFilter);
-        if (set.has(t)) set.delete(t); else set.add(t);
-        tagFilter = Array.from(set);
-        // Refresh tags UI to reflect selected state
-        updateTagsUI();
-        // Ask server for filtered/sorted structure
-        loadMenu();
+        toggleTagFilter(chip.getAttribute('data-tag'));
     });
 }
 
@@ -829,52 +822,151 @@ let tagsIndexBuilding = false;
 
 function normalizeTag(t){ return (t || '').trim().toLowerCase(); }
 
-function renderTagFilterBar() {
-    // Build a sorted array of [norm, display] pairs
-    const pairs = Array.from(allKnownTags.entries())
-        .map(([norm, display]) => [norm, display || norm])
-        .sort((a, b) => a[1].localeCompare(b[1]));
-    const active = new Set(tagFilter.map(normalizeTag));
-    const chipsHtml = pairs.length ? (
-        `<div class="tag-suggestions" id="tag-suggestions">` +
-        pairs.map(([norm, display])=>{
-            const sel = active.has(norm) ? ' selected' : '';
-            return `<span class="tag-suggestion${sel}" data-tag="${norm}" title="Toggle filter: ${display}">${display}</span>`;
-        }).join(' ') +
-        `</div>`
-    ) : '<div class="tag-suggestions" id="tag-suggestions"><span class="menu-filter-label">No tags indexed yet</span></div>';
-    return `
-    <div class="menu-filter-bar">
-        <div class="menu-filter-label">Filter by tag</div>
-        ${chipsHtml}
-    </div>`;
+function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
 }
 
-function attachTagFilterEvents() {
-    const sugg = document.getElementById('tag-suggestions');
+function tagDisplay(norm) { return allKnownTags.get(norm) || norm; }
 
-    if (sugg) {
-        sugg.addEventListener('click', (e) => {
-            const item = e.target.closest('.tag-suggestion');
-            if (!item) return;
-            const t = normalizeTag(item.getAttribute('data-tag'));
-            const set = new Set(tagFilter);
-            if (set.has(t)) {
-                set.delete(t);
-            } else {
-                set.add(t);
-            }
-            tagFilter = Array.from(set);
-            if (window.__lastStructure) {
-                const data = window.__lastStructure;
-                const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(data, tagFilter) : data;
-                // Rely on server-side sorting; no client-side sorting applied
-                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
-                attachTagFilterEvents();
-            }
-        });
+// Header row (Pages drop zone + filter button) and the active filter chips shown above the tree
+function renderMenuHeader() {
+    const count = tagFilter.length;
+    const badge = count ? `<span class="tag-filter-badge">${count}</span>` : '';
+    const header = `
+    <div class="menu-header">
+        <div id="root-dropzone" class="root-dropzone" aria-label="Pages"></div>
+        <button type="button" id="tag-filter-btn" class="icon-button tag-filter-btn${count ? ' active' : ''}"
+                title="Filter by tag" aria-label="Filter by tag" aria-haspopup="dialog" aria-controls="tag-filter-popover"
+                aria-expanded="${tagFilterPopover && !tagFilterPopover.hidden}">
+            <span class="material-symbols-rounded">filter_list</span>${badge}
+        </button>
+    </div>`;
+    if (!count) return header;
+    const chips = tagFilter.map(norm => {
+        const display = escapeHtml(tagDisplay(norm));
+        return `<button type="button" class="active-tag-chip" data-tag="${escapeHtml(norm)}" title="Remove filter: ${display}">` +
+               `<span>${display}</span><span class="material-symbols-rounded" aria-hidden="true">close</span></button>`;
+    }).join('');
+    return header + `<div class="active-tag-filters" aria-label="Active tag filters">${chips}</div>`;
+}
+
+function renderMenu(tree) {
+    menu.innerHTML = renderMenuHeader() + `<div id="menu-tree" class="menu-tree">${renderTree(tree)}</div>`;
+    try { attachRootDropzoneEvents(); } catch {}
+}
+
+function setTagFilter(tags) {
+    tagFilter = Array.from(new Set((tags || []).map(normalizeTag).filter(Boolean)));
+    // Keep the page tag chips and the popover checkboxes in sync with the filter
+    const active = new Set(tagFilter);
+    document.querySelectorAll('#tags-view .tag-chip.selectable').forEach(chip => {
+        chip.classList.toggle('selected', active.has(chip.getAttribute('data-tag')));
+    });
+    document.querySelectorAll('#tag-filter-list input[type="checkbox"]').forEach(cb => {
+        cb.checked = active.has(cb.getAttribute('data-tag'));
+    });
+    loadMenu();
+}
+
+function toggleTagFilter(tag) {
+    const t = normalizeTag(tag);
+    setTagFilter(tagFilter.includes(t) ? tagFilter.filter(x => x !== t) : [...tagFilter, t]);
+}
+
+// Tag filter popover
+const tagFilterPopover = document.getElementById('tag-filter-popover');
+const tagFilterInput = document.getElementById('tag-filter-input');
+const tagFilterList = document.getElementById('tag-filter-list');
+
+function renderTagFilterList() {
+    const counts = new Map();
+    for (const list of Object.values(tagsIndex)) {
+        for (const t of list || []) counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    const pairs = Array.from(allKnownTags.keys())
+        .map(norm => [norm, tagDisplay(norm)])
+        .sort((a, b) => a[1].localeCompare(b[1]));
+    if (!pairs.length) {
+        tagFilterList.innerHTML = '<li class="tag-filter-empty">No tags yet</li>';
+        return;
+    }
+    const active = new Set(tagFilter);
+    tagFilterList.innerHTML = pairs.map(([norm, display]) => `
+        <li data-name="${escapeHtml(display.toLowerCase())}">
+            <label class="tag-filter-option">
+                <input type="checkbox" data-tag="${escapeHtml(norm)}"${active.has(norm) ? ' checked' : ''} />
+                <span class="tag-filter-name">${escapeHtml(display)}</span>
+                <span class="tag-filter-count">${counts.get(norm) || 0}</span>
+            </label>
+        </li>`).join('');
+}
+
+function applyTagFilterQuery() {
+    const q = normalizeTag(tagFilterInput.value);
+    tagFilterList.querySelectorAll('li[data-name]').forEach(li => {
+        li.hidden = !!q && !li.getAttribute('data-name').includes(q);
+    });
+}
+
+function openTagFilterPopover() {
+    const btn = document.getElementById('tag-filter-btn');
+    if (!tagFilterPopover || !btn) return;
+    renderTagFilterList();
+    tagFilterInput.value = '';
+    // Position just below the filter button, relative to the sidebar
+    const sidebarRect = document.getElementById('sidebar').getBoundingClientRect();
+    tagFilterPopover.style.top = `${btn.getBoundingClientRect().bottom - sidebarRect.top + 4}px`;
+    tagFilterPopover.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    tagFilterInput.focus();
+    window.addEventListener('click', onTagFilterOutsideClick, { capture: true });
+    window.addEventListener('keydown', onTagFilterKeydown);
+}
+
+function closeTagFilterPopover() {
+    if (!tagFilterPopover || tagFilterPopover.hidden) return;
+    tagFilterPopover.hidden = true;
+    document.getElementById('tag-filter-btn')?.setAttribute('aria-expanded', 'false');
+    window.removeEventListener('click', onTagFilterOutsideClick, { capture: true });
+    window.removeEventListener('keydown', onTagFilterKeydown);
+}
+
+function onTagFilterOutsideClick(e) {
+    if (!e.target.closest('#tag-filter-popover') && !e.target.closest('#tag-filter-btn')) closeTagFilterPopover();
+}
+
+function onTagFilterKeydown(e) {
+    if (e.key === 'Escape') {
+        closeTagFilterPopover();
+        document.getElementById('tag-filter-btn')?.focus();
     }
 }
+
+if (tagFilterPopover) {
+    tagFilterInput.addEventListener('input', applyTagFilterQuery);
+    // Enter toggles the first tag matching the query
+    tagFilterInput.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const first = tagFilterList.querySelector('li[data-name]:not([hidden]) input[type="checkbox"]');
+        if (first) toggleTagFilter(first.getAttribute('data-tag'));
+    });
+    tagFilterList.addEventListener('change', (e) => {
+        const cb = e.target.closest('input[type="checkbox"]');
+        if (cb) toggleTagFilter(cb.getAttribute('data-tag'));
+    });
+    document.getElementById('tag-filter-clear').addEventListener('click', () => setTagFilter([]));
+}
+
+// The menu is re-rendered often, so handle its filter controls by delegation
+menu.addEventListener('click', (e) => {
+    if (e.target.closest('#tag-filter-btn')) {
+        if (tagFilterPopover.hidden) openTagFilterPopover(); else closeTagFilterPopover();
+        return;
+    }
+    const chip = e.target.closest('.active-tag-chip');
+    if (chip) toggleTagFilter(chip.getAttribute('data-tag'));
+});
 
 function collectFilesFromStructure(nodes, acc) {
     for (const n of nodes) {
@@ -934,7 +1026,11 @@ function filterTreeByTags(nodes, requiredTags) {
 
 // Note: No client-side sorting. The backend returns the structure already sorted.
 
+let menuLoadSeq = 0;
+
 function loadMenu() {
+    // Ignore responses that arrive after a newer request, e.g. when toggling tags quickly
+    const seq = ++menuLoadSeq;
     const params = new URLSearchParams();
     params.set('sorted', 'true');
     params.set('dirsFirst', 'true');
@@ -945,14 +1041,13 @@ function loadMenu() {
     return fetch(`/api/pages/structure?${params.toString()}`)
         .then(res => res.json())
         .then(async data => {
-            window.__lastStructure = data;
-            // build tags index if empty, before rendering so the tag filter bar lists the tags
+            // build tags index if empty, before rendering so the tag filter lists the tags
             if (Object.keys(tagsIndex).length === 0 && !tagsIndexBuilding) {
                 await buildTagsIndexFromStructure(data).catch(() => {});
             }
-            menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(data)}</div>` + renderTagFilterBar();
-            attachTagFilterEvents();
-            try { attachRootDropzoneEvents(); } catch {}
+            if (seq !== menuLoadSeq) return data;
+            window.__lastStructure = data;
+            renderMenu(data);
             return data;
         })
         .catch(error => {
@@ -961,12 +1056,11 @@ function loadMenu() {
             return fetch('/api/pages/structure')
                 .then(r => r.json())
                 .then(fallbackData => {
+                    if (seq !== menuLoadSeq) return fallbackData;
                     window.__lastStructure = fallbackData;
                     const tree = (tagFilter.length && Object.keys(tagsIndex).length) ? filterTreeByTags(fallbackData, tagFilter) : fallbackData;
                     // Rely on backend ordering even in fallback; do not sort on client
-                    menu.innerHTML = `<div id=\"root-dropzone\" class=\"root-dropzone\" aria-label=\"Pages\"></div><div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
-                    attachTagFilterEvents();
-                    try { attachRootDropzoneEvents(); } catch {}
+                    renderMenu(tree);
                     showToast && showToast('Using fallback menu rendering', 'warning');
                     return fallbackData;
                 })
@@ -1468,21 +1562,8 @@ async function saveFile() {
         isEditMode = false;
         updateToolbar();
 
-        // Re-render the menu filter bar so new/changed tags appear immediately
-        try {
-            if (window.__lastStructure) {
-                const data = window.__lastStructure;
-                const tree = (tagFilter.length && Object.keys(tagsIndex).length)
-                    ? filterTreeByTags(data, tagFilter)
-                    : data;
-                // Rely on server-side sorting; no client-side sorting applied
-                menu.innerHTML = `<div id=\"menu-tree\" class=\"menu-tree\">${renderTree(tree)}</div>` + renderTagFilterBar();
-                attachTagFilterEvents();
-            } else {
-                // Fallback: reload menu if cached structure is missing
-                loadMenu();
-            }
-        } catch {}
+        // Reload the menu, since changed tags can change which notes match the active filter
+        loadMenu();
 
     } catch (error) {
         console.error('Error saving file:', error);
@@ -1587,10 +1668,6 @@ loadMenu();
         loadMenu();
         closeAnchoredResults();
         loadFile(path);
-    }
-
-    function escapeHtml(str){
-        return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
     }
 
     searchButton.addEventListener('click', performSearch);

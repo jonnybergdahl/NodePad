@@ -393,23 +393,165 @@ a {
     box-shadow: inset 0 0 0 2px var(--md-primary);
 }
 
-/* Tag filter at the bottom of the menu */
-.menu-filter-bar {
-    margin-top: 12px;
-    padding: 12px 4px 0;
-    border-top: 1px solid var(--md-outline-variant);
-}
-
-.menu-filter-label {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--md-on-surface-variant);
+/* Menu header: Pages drop zone with the tag filter button */
+.menu-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     margin-bottom: 8px;
 }
 
-.menu-filter-row {
+#menu .menu-header .root-dropzone {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+
+.tag-filter-btn {
+    position: relative;
+}
+
+.tag-filter-btn.active {
+    color: var(--md-primary);
+}
+
+.tag-filter-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--md-shape-full);
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+}
+
+/* Active tag filters shown above the tree */
+.active-tag-filters {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 4px 8px;
+}
+
+.active-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 6px 0 12px;
+    border: none;
+    border-radius: var(--md-shape-small);
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.active-tag-chip span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.active-tag-chip .material-symbols-rounded {
+    font-size: 16px;
+}
+
+.active-tag-chip:hover {
+    filter: brightness(0.95);
+}
+
+.active-tag-chip:focus-visible {
+    outline: 2px solid var(--md-primary);
+    outline-offset: 2px;
+}
+
+/* Tag filter popover */
+#sidebar {
+    position: relative;
+}
+
+.tag-filter-popover {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
+    max-height: 60vh;
+    padding: 12px;
+    background: var(--md-surface-container);
+    color: var(--md-on-surface);
+    border-radius: var(--md-shape-large);
+    box-shadow: var(--md-elevation-3);
+}
+
+.tag-filter-popover[hidden] {
+    display: none;
+}
+
+.tag-filter-popover .menu-filter-input {
+    flex: none;
+}
+
+.tag-filter-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0 -12px;
+    padding: 0;
+}
+
+.tag-filter-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 36px;
+    padding: 0 16px;
+    cursor: pointer;
+}
+
+.tag-filter-option:hover {
+    background: var(--md-state-hover);
+}
+
+.tag-filter-option input {
+    margin: 0;
+    accent-color: var(--md-primary);
+}
+
+.tag-filter-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-filter-count {
+    color: var(--md-on-surface-variant);
+    font-size: 0.75rem;
+}
+
+.tag-filter-empty {
+    padding: 8px 16px;
+    color: var(--md-on-surface-variant);
+}
+
+.tag-filter-actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .menu-filter-input,
@@ -434,21 +576,13 @@ a {
 
 /* ---------- Tag chips ---------- */
 
-.tag-suggestions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-}
-
 .tags-view {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.tag-chip,
-.tag-suggestion {
+.tag-chip {
     display: inline-flex;
     align-items: center;
     height: 28px;
@@ -461,17 +595,14 @@ a {
     font-weight: 500;
 }
 
-.tag-suggestion,
 .tag-chip.selectable {
     cursor: pointer;
 }
 
-.tag-suggestion:not(.selected):hover,
 .tag-chip.selectable:not(.selected):hover {
     background: var(--md-state-hover);
 }
 
-.tag-suggestion.selected,
 .tag-chip.selected {
     background: var(--md-primary-container);
     border-color: transparent;

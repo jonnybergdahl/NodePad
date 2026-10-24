@@ -74,6 +74,13 @@
             <span>To do</span>
         </a>
         <div id="menu"></div>
+        <div id="tag-filter-popover" class="tag-filter-popover" role="dialog" aria-label="Filter by tag" hidden>
+            <input id="tag-filter-input" class="menu-filter-input" type="search" placeholder="Find tag" aria-label="Find tag" />
+            <ul id="tag-filter-list" class="tag-filter-list"></ul>
+            <div class="tag-filter-actions">
+                <button type="button" id="tag-filter-clear" class="button text">Clear</button>
+            </div>
+        </div>
     </nav>
     <div id="editor-section">
         <div class="toolbar">
